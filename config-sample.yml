@@ -1,6 +1,5 @@
 persistence: state.pickle
 api_key: 123456789:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-group_id: 0123456789
 admin_id: 987654321
 bot_name: slateboy
 locale: en

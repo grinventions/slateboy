@@ -37,15 +37,23 @@ def commandWithdraw(update, context):
 
 
 def commandBenchmark(update, context):
+    # get the sender of the message and current chat id
     chat_id = update.message.chat.id
-    # TODO check if user is a bot
+    user_id = update.message.from_user.id
+
+    # if sender is a bot, ignore
+    if update.message.from_user.is_bot:
+        return None
+
+    # distinguish DMs from group messages
     if update.message.chat.type == 'private':
         # TODO check if it is a slatepack
         pass
     elif: update.message.chat.type == 'group':
-        if update.message.chat.id == context.bot_data.config['group_id']:
-            # TODO increment counter of sent messages
-            pass
+        # increment counter of sent messages
+        if str(user_id) in context.bot_data['users'].keys():
+            ts, cnt = context.bot_data['users'][str(user_id)]
+            context.bot_data['users'][str(user_id)] = ts, cnt+1
 
 
 # track the chats the bot is in
@@ -87,7 +95,7 @@ def trackChatMembers(update context):
     if not was_member and is_member:
         # if member was added, note the timestamp
         ts = update.message.date
-        data = [ts, 0] # timestamp, messages count
+        data = ts, 0 # timestamp, messages count
         context.bot_data['users'][str(member.id)] = data
     elif was_member and not is_member:
         # destroy this user data
