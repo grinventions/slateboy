@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 import argparse
 import logging
 import yaml
-import functools
 import pathlib
 import os
 
@@ -14,9 +13,11 @@ from i18n import resource_loader
 from i18n import config as i18config
 from i18n.translator import t
 
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, Filters, PicklePersistence
+from telegram.ext import Updater, CommandHandler, ChatMemberHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, Filters, PicklePersistence
 from telegram import InlineKeyboardButton, KeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, ReplyKeyboardMarkup
 from telegram.error import BadRequest
+
+from slateboy.handlers import commandDeposit, commandWithdraw, commandBenchmark, trackChats, trackChatMembers
 
 # parse the command line arguments
 def parseConfigFile(filepath):
@@ -64,8 +65,19 @@ updater = Updater(config['api_key'], persistence=my_persistence, use_context=Tru
 # Get the dispatcher to register handlers
 dp = updater.dispatcher
 
+# initiation function
+def initiateBot(update, context):
+    context.bot_data.set(config)
+
 # register handlers
-# TODO
+dp.add_handler(CommandHandler('start', initiateBot))
+dp.add_handler(CommandHandler('donate', commandDoposit))
+dp.add_handler(CommandHandler('faucet', commandWithdraw))
+
+dp.add_handler(ChatMemberHandler(trackChats, ChatMemberHandler.MY_CHAT_MEMBER)
+dp.add_handler(ChatMemberHandler(trackChatMembers, ChatMemberHandler.MY_CHAT_MEMBER)
+
+dp.add_handler(MessageHandler(Filters.text, commandBenchmark))
 
 # ready!
 logger.info('Slatepack bot started...')

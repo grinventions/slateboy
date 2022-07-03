@@ -1,5 +1,6 @@
 {
     "en": {
-        "msg_welcome": "Hello I am Slateboy, the slatepack bot!"
+        "msg_welcome": "Hello I am Slateboy, the slatepack bot!",
+        "msg_admin_only": "This command is reserved exclusively for the admin."
     }
 }
