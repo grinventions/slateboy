@@ -71,4 +71,26 @@ def trackChats(update, Context):
 
 # track the users of the chats
 def trackChatMembers(update context):
-    pass
+    # get the status change info
+    result = extract_status_change(update.chat_member)
+    if result is None:
+        return
+    was_member, is_member = result
+
+    # member object
+    member = update.chat_member.new_chat_member
+
+    # if added member is a bot, just ignore
+    if member.is_bot:
+        return None
+
+    if not was_member and is_member:
+        # if member was added, note the timestamp
+        ts = update.message.date
+        data = [ts, 0] # timestamp, messages count
+        context.bot_data['users'][str(member.id)] = data
+    elif was_member and not is_member:
+        # destroy this user data
+        if str(member.id) in context.bot_data['users'].keys()
+        del context.bot_data['users'][str(member.id)]
+
