@@ -32,8 +32,135 @@ def commandDeposit(update, context):
 
 
 def commandWithdraw(update, context):
-    # TODO check if this user qualifies for the withdrawal
-    pass
+    # get the sender of the message and current chat id
+    chat_id = update.message.chat.id
+    user_id = update.message.from_user.id
+
+    # if sender is a bot, ignore
+    if update.message.from_user.is_bot:
+        return None
+
+    # check if user exists
+    if str(user_id) not in context.bot_data['users'].keys():
+        return None
+    ts, cnt, faucet_request = context.bot_data['users'][str(user_id)]
+
+    # user has to have a certain number of messages sent to the group
+    req_min_cnt = context.bot_data['config']['req_min_cnt']
+    if cnt < req_min_cnt:
+        reply_text = t('slateboy.msg_violated_min_cnt').format(str(req_min_cnt))
+        return context.bot.send_message(
+            chat_id=chat_id,
+            text=reply_text,
+            reply_to_message_id=update.message.message_id)
+
+    # user has to be in the group for certain amount of time
+    cur_ts = update.message.date
+    req_min_ts = context.bot_data['config']['req_min_ts']
+    if cur_ts - ts < req_min_ts:
+        reply_text = t('slateboy.msg_violated_min_ts').format(str(req_min_ts))
+        return context.bot.send_message(
+            chat_id=chat_id,
+            text=reply_text,
+            reply_to_message_id=update.message.message_id)
+
+    # check if there already is one request
+    if faucet_request is None:
+        # create a new faucet request
+        faucet_request = update.message.message_id
+        context.bot_data['users'][str(user_id)] = ts, cnt, faucet_request
+
+        # inform of the success
+        reply_text = t('slateboy.msg_new_request')
+        return context.bot.send_message(
+            chat_id=chat_id,
+            text=reply_text,
+            reply_to_message_id=faucet_request)
+
+    # provide status of the current faucet request
+    approvals = context.bot_data['requests'][str(faucet_request_message_id)]['c']
+    min_approvals = context.bot_data['config']['min_approvals']
+
+    if approvals < min_approvals:
+        reply_text = t('slateboy.msg_request_insufficient').format(
+            str(approvals), str(min_approvals), str(min_approvals - approvals))
+        return context.bot.send_message(
+            chat_id=chat_id,
+            text=reply_text,
+            reply_to_message_id=faucet_request)
+
+    # approved
+    reply_text = t('slateboy.msg_request_insufficient').format(
+        str(approvals), str(min_approvals))
+    # TODO send a slatepack in DM
+    return context.bot.send_message(
+        chat_id=chat_id,
+        text=reply_text,
+        reply_to_message_id=faucet_request)
+
+
+def commandApprove(update, context):
+    # get the sender of the message and current chat id
+    chat_id = update.message.chat.id
+    user_id = update.message.from_user.id
+
+    # if sender is a bot, ignore
+    if update.message.from_user.is_bot:
+        return None
+
+    # check if user responds to another message
+    if update.message.reply_to_message is None:
+        reply_text = t('slateboy.msg_approve_reply')
+        return context.bot.send_message(
+            chat_id=chat_id,
+            text=reply_text,
+            reply_to_message_id=update.message.message_id)
+
+    # check if there is a record for this message
+    faucet_request_message_id = update.message.reply_to_message
+    faucet_request_message_author = update.message.reply_to_message.from_user.id
+    if str(faucet_request_message_id) not in context.bot_data['requests'].keys():
+        reply_text = t('slateboy.msg_missing_faucet_requests')
+        return context.bot.send_message(
+            chat_id=chat_id,
+            text=reply_text,
+            reply_to_message_id=update.message.message_id)
+
+    # check if user qualifies to approve requests
+    # user has to have a record
+    if str(member.id) not in context.bot_data['users'].keys():
+        return None
+    ts, cnt = context.bot_data['users'][str(user_id)]
+
+    # user has to have a certain number of messages sent to the group
+    min_cnt = context.bot_data['config']['min_cnt']
+    if cnt < min_cnt:
+        reply_text = t('slateboy.msg_violated_min_cnt').format(str(min_cnt))
+        return context.bot.send_message(
+            chat_id=chat_id,
+            text=reply_text,
+            reply_to_message_id=update.message.message_id)
+
+    # user has to be in the group for certain amount of time
+    cur_ts = update.message.date
+    min_ts = context.bot_data['config']['min_ts']
+    if cur_ts - ts < in_ts:
+        reply_text = t('slateboy.msg_violated_min_ts').format(str(min_ts))
+        return context.bot.send_message(
+            chat_id=chat_id,
+            text=reply_text,
+            reply_to_message_id=update.message.message_id)
+
+    # looks like user can approve, increase the approval counter
+    approval_counter = context.bot_data['requests'][str(faucet_request_message_id)]['c']
+    context.bot_data['requests'][str(faucet_request_message_id)]['c'] = approval_counter + 1
+
+    # it all went smoothly
+    reply_text = t('slateboy.msg_approval_successful')
+    return context.bot.send_message(
+        chat_id=chat_id,
+        text=reply_text,
+        reply_to_message_id=update.message.message_id)
 
 
 def commandBenchmark(update, context):
@@ -52,8 +179,8 @@ def commandBenchmark(update, context):
     elif: update.message.chat.type == 'group':
         # increment counter of sent messages
         if str(user_id) in context.bot_data['users'].keys():
-            ts, cnt = context.bot_data['users'][str(user_id)]
-            context.bot_data['users'][str(user_id)] = ts, cnt+1
+            ts, cnt, faucet_request = context.bot_data['users'][str(user_id)]
+            context.bot_data['users'][str(user_id)] = ts, cnt+1, faucet_request
 
 
 # track the chats the bot is in
@@ -95,7 +222,7 @@ def trackChatMembers(update context):
     if not was_member and is_member:
         # if member was added, note the timestamp
         ts = update.message.date
-        data = ts, 0 # timestamp, messages count
+        data = ts, 0, None # timestamp, messages count, faucet request
         context.bot_data['users'][str(member.id)] = data
     elif was_member and not is_member:
         # destroy this user data
