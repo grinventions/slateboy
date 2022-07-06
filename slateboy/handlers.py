@@ -27,8 +27,38 @@ def admin(func):
 
 
 def commandDeposit(update, context):
-    # send slatepack in DM
-    pass
+    # get the sender of the message and current chat id
+    chat_id = update.message.chat.id
+    user_id = update.message.from_user.id
+
+    # if sender is a bot, ignore
+    if update.message.from_user.is_bot:
+        return None
+
+    # inform everyone of the donation in progress
+    reply_text = t('slateboy.msg_donation_0')
+    context.bot.send_message(
+        chat_id=chat_id,
+        text=reply_text,
+        reply_to_message_id=update.message.message_id)
+
+    # get the slatepack address
+    slatepack_address = 'grin10987654321' # TODO
+
+    # send the DMs
+    reply_text = t('slateboy.msg_donation_1')
+    context.bot.send_message(
+        chat_id=user_id,
+        text=reply_text)
+
+    context.bot.send_message(
+        chat_id=user_id,
+        text=slatepack_address)
+
+    reply_text = t('slateboy.msg_donation_2').format(slatepack_address)
+    context.bot.send_message(
+        chat_id=user_id,
+        text=reply_text)
 
 
 def commandWithdraw(update, context):
@@ -89,7 +119,10 @@ def commandWithdraw(update, context):
             text=reply_text,
             reply_to_message_id=faucet_request)
 
-    # approved
+    # approved, check if there are unlocked outputs
+    # TODO
+
+    # there are unlocked outputs
     reply_text = t('slateboy.msg_request_insufficient').format(
         str(approvals), str(min_approvals))
     # TODO send a slatepack in DM
