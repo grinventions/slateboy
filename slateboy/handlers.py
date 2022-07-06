@@ -1,4 +1,5 @@
 import functools
+import re
 
 from i18n.translator import t
 
@@ -120,16 +121,36 @@ def commandWithdraw(update, context):
             reply_to_message_id=faucet_request)
 
     # approved, check if there are unlocked outputs
-    # TODO
+    locked = False # TODO
+    if locked:
+        reply_text = t('slateboy.msg_request_locked')
+        return context.bot.send_message(
+            chat_id=chat_id,
+            text=reply_text,
+            reply_to_message_id=faucet_request)
 
-    # there are unlocked outputs
-    reply_text = t('slateboy.msg_request_insufficient').format(
-        str(approvals), str(min_approvals))
-    # TODO send a slatepack in DM
-    return context.bot.send_message(
+    # get the slatepack
+    slatepack = 'BEGINSLATEPACK 0987654321 ENDSLATEPACK' # TODO
+
+    # inform everyone of the slatepack being sent
+    reply_text = t('slateboy.msg_withdraw_0')
+    context.bot.send_message(
         chat_id=chat_id,
         text=reply_text,
         reply_to_message_id=faucet_request)
+
+    # send the DMs
+    reply_text = t('slateboy.msg_withdraw_1')
+    context.bot.send_message(
+        chat_id=user_id,
+        text=reply_text)
+
+    reply_text = t('slateboy.msg_withdraw_1')
+    context.bot.send_message(
+        chat_id=user_id,
+        text=slatepack)
+
+    # TODO mark the state as in processing
 
 
 def commandApprove(update, context):
@@ -207,8 +228,14 @@ def commandBenchmark(update, context):
 
     # distinguish DMs from group messages
     if update.message.chat.type == 'private':
-        # TODO check if it is a slatepack
-        pass
+        # check if it is a slatepack
+        regex = 'BEGINSLATEPACK[\\s\\S]*\\sENDSLATEPACK'
+        matches = re.search(regex, update.message.text, flags=re.DOTALL)
+        if matches is not None:
+            slatepack = matches.group(0)
+            # TODO check if state is in processing, if so finalize
+            # otherwise run receive
+            pass
     elif: update.message.chat.type == 'group':
         # increment counter of sent messages
         if str(user_id) in context.bot_data['users'].keys():

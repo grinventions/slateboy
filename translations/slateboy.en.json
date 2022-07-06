@@ -10,8 +10,11 @@
         "msg_new_request": "You already have a faucet request message, you either need to wait for it to expire or /cancel it.",
         "msg_request_insufficient": "Your request gathered {0}/{1} approvals so you still need {2} more to go, keep it up!",
         "msg_request_sufficient": "Your request gathered {0}/{1} approvals. You made it! I am sending you a slatepack in DM!",
+        "msg_request_locked": "At this moment all our outputs are locked, could you try again later?",
         "msg_donation_0": "Thanks for willing to donate! We are sending you a DM with the slatepack address as well as wallet instructions!",
         "msg_donation_1": "Thanks for willing to donate! Here is our slatepack address:",
-        "msg_donation_2": "Please run: `grin-wallet send -d {0} <amount>` to send us `<amount>` of GRIN. The wallet will output a slatepack, just paste it here."
+        "msg_donation_2": "Please run: `grin-wallet send -d {0} <amount>` to send us `<amount>` of GRIN. The wallet will output a slatepack, just paste it here.",
+        "msg_withdraw_0": "Congratulations! Your withdrawal is approved and we are sending you a slatepack message in DM along with the instructions!",
+        "msg_withdraw_1": "Here is your slatepack! Please run `grin-wallet receive` and paste it there!",
     }
 }
