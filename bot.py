@@ -17,7 +17,7 @@ from telegram.ext import Updater, CommandHandler, ChatMemberHandler, CallbackQue
 from telegram import InlineKeyboardButton, KeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, ReplyKeyboardMarkup
 from telegram.error import BadRequest
 
-from slateboy.handlers import commandDeposit, commandWithdraw, commandApprove, commandBenchmark, trackChats, trackChatMembers
+from slateboy.handlers import commandDeposit, commandWithdraw, commandApprove, commandBenchmark, trackChats, trackChatMembers, cleanUpJob
 
 # parse the command line arguments
 def parseConfigFile(filepath):
@@ -83,6 +83,9 @@ dp.add_handler(MessageHandler(Filters.text, commandBenchmark))
 # ready!
 logger.info('Slatepack bot started...')
 bot = updater.bot
+
+job_queue = updater.job_queue
+job_queue.run_repeating(cleanUpJob, interval=10*60*60, first=10*60*60)
 
 updater.start_polling()
 updater.idle()

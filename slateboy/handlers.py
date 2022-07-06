@@ -289,3 +289,8 @@ def trackChatMembers(update context):
         if str(member.id) in context.bot_data['users'].keys()
         del context.bot_data['users'][str(member.id)]
 
+
+def cleanUpJob(context):
+    # TODO check if expired withdrawals that keep outputs locked
+    # TODO cancel those transactions and inform users to try again
+    # TODO clean-up the list
