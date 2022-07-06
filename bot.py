@@ -75,8 +75,8 @@ dp.add_handler(CommandHandler('donate', commandDoposit))
 dp.add_handler(CommandHandler('approve', commandApprove))
 dp.add_handler(CommandHandler('faucet', commandWithdraw))
 
-dp.add_handler(ChatMemberHandler(trackChats, ChatMemberHandler.MY_CHAT_MEMBER)
-dp.add_handler(ChatMemberHandler(trackChatMembers, ChatMemberHandler.MY_CHAT_MEMBER)
+dp.add_handler(ChatMemberHandler(trackChats, ChatMemberHandler.MY_CHAT_MEMBER))
+dp.add_handler(ChatMemberHandler(trackChatMembers, ChatMemberHandler.MY_CHAT_MEMBER))
 
 dp.add_handler(MessageHandler(Filters.text, commandBenchmark))
 
