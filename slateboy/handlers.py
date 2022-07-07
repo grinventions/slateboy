@@ -2,7 +2,7 @@ import functools
 import re
 
 from i18n.translator import t
-
+from datetime import datetime
 from telegram import Chat
 
 from slateboy.status import extract_status_change
@@ -452,6 +452,50 @@ def trackChatMembers(update context):
 
 
 def cleanUpJob(context):
-    # TODO check if expired withdrawals that keep outputs locked
-    # TODO cancel those transactions and inform users to try again
-    # TODO clean-up the list
+    # when is now?
+    dt = datetime.now(timezone.utc)
+    utc_time = dt.replace(tzinfo=timezone.utc)
+    cur_ts = utc_time.timestamp()
+
+    # remove expired requests
+    cur_ts = update.message.date
+    max_request_age = context.bot_data['config']['max_request_age']
+
+    to_remove = []
+    to_inform = []
+
+    for faucet_request_id_str, (faucet_request_timestamp, request_author, approvals) in context.bot_data['requests'].items():
+        if cur_ts - faucet_request_timestamp > max_request_age:
+            to_remove.append(faucet_request_id_str)
+            to_inform.append(request_author)
+
+    for faucet_request_id_str, author in zip(to_remove, to_inform):
+        del context.bot_data['requests'][faucet_request_id_str]
+        ts, cnt, _ = context.bot_data['users'][str(author)]
+        context.bot_data['users'][str(author)] = ts, cnt, None
+
+        reply_text = t('slateboy.msg_expired_dm').format(str(max_request_age))
+        context.bot.send_message(
+            chat_id=author,
+            text=reply_text)
+
+    # check if expired withdrawals that keep outputs locked
+    max_withdrawal_age = context.bot_data['config']['max_withdrawal_age']
+
+    to_remove = []
+    to_inform = []
+
+    for author_str, withdrawal_ts in context.bot_data['withdrawals'].items():
+        if cur_ts - withdrawal_ts > max_withdrawal_age:
+            to_remove.append(author_str)
+            to_inform.append(int(author_str))
+
+    for author_str, author in zip(to_remove, to_inform):
+        del context.bot_data['withdrawals'][author_str]
+
+        reply_text = t('slateboy.msg_slatepack_expired')
+        context.bot.send_message(
+            chat_id=author,
+            text=reply_text)
+
+        # TODO cancel the tx

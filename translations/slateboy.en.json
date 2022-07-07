@@ -19,6 +19,8 @@
         "msg_withdraw_0": "Congratulations! Your withdrawal is approved and we are sending you a slatepack message in DM along with the instructions!",
         "msg_withdraw_1": "Here is your slatepack! Please run `grin-wallet receive` and paste it there!",
         "msg_expired": "This faucet request has exceeded the maximum age and now is expired, we are removing it. The author is welcome to create a new request.",
-        "msg_request_cancelled": "Your faucet request has been successfully cancelled"
+        "msg_expired_dm": "Your faucet request has exceeded the maximum age and now is expired, we are removing it. Your are welcome to create a new request. Make sure it gets approved and you initiate the withdrawal before it reaches the maximum age of {0} seconds.",
+        "msg_request_cancelled": "Your faucet request has been successfully cancelled",
+        "msg_slatepack_expired": "It took too long for you to respond with the slatepack. We impose time limit to prevent our tx inputs be locked for too long. Feel free to run /withdraw one more time in the group to start over."
     }
 }

@@ -10,3 +10,4 @@ min_ts: 86400
 req_min_cnt: 1000
 req_min_ts: 86400
 max_request_age: 86400
+max_withdrawal_age: 600
