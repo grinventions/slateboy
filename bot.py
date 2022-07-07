@@ -17,7 +17,9 @@ from telegram.ext import Updater, CommandHandler, ChatMemberHandler, CallbackQue
 from telegram import InlineKeyboardButton, KeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, ReplyKeyboardMarkup
 from telegram.error import BadRequest
 
-from slateboy.handlers import commandDeposit, commandWithdraw, commandApprove, commandBenchmark, trackChats, trackChatMembers, cleanUpJob
+from slateboy.handlers import commandDeposit, commandWithdraw
+from slateboy.handlers import commandFaucet, commandFaucetStatus, commandFaucetCancel, commandApprove
+from slateboy.handlers import commandBenchmark, trackChats, trackChatMembers, cleanUpJob
 
 # parse the command line arguments
 def parseConfigFile(filepath):
@@ -72,8 +74,11 @@ def initiateBot(update, context):
 # register handlers
 dp.add_handler(CommandHandler('start', initiateBot))
 dp.add_handler(CommandHandler('donate', commandDoposit))
+dp.add_handler(CommandHandler('withdraw', commandWithdraw))
 dp.add_handler(CommandHandler('approve', commandApprove))
-dp.add_handler(CommandHandler('faucet', commandWithdraw))
+dp.add_handler(CommandHandler('faucet', commandFaucet))
+dp.add_handler(CommandHandler('status', commandFaucetStatus))
+dp.add_handler(CommandHandler('cancel', commandFaucetCancel))
 
 dp.add_handler(ChatMemberHandler(trackChats, ChatMemberHandler.MY_CHAT_MEMBER))
 dp.add_handler(ChatMemberHandler(trackChatMembers, ChatMemberHandler.MY_CHAT_MEMBER))
