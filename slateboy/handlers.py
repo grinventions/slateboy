@@ -62,7 +62,7 @@ def registered(func):
         args = tuple(list(args) + [ts, cnt, faucet_request_message_id])
 
         return func(*args, **kwargs)
-    return wrapper_human_only
+    return wrapper_faucet
 
 
 @human
@@ -111,7 +111,7 @@ def commandWithdraw(update, context, ts, cnt, faucet_request_message_id):
             text=reply_text,
             reply_to_message_id=update.message.message_id)
 
-    if str(faucet_request_message_id) is not in context.bot_data['requests']:
+    if str(faucet_request_message_id) not in context.bot_data['requests']:
         reply_text = t('slateboy.msg_missing_faucet_request')
         return context.bot.send_message(
             chat_id=chat_id,
@@ -233,7 +233,7 @@ def commandFaucetStatus(update, context, ts, cnt, faucet_request_message_id):
             text=reply_text,
             reply_to_message_id=update.message.message_id)
 
-    if str(faucet_request_message_id) is not in context.bot_data['requests']:
+    if str(faucet_request_message_id) not in context.bot_data['requests']:
         reply_text = t('slateboy.msg_missing_faucet_request')
         return context.bot.send_message(
             chat_id=chat_id,
@@ -390,7 +390,7 @@ def commandBenchmark(update, context, ts, cnt, faucet_request_message_id):
                 # user is donating, we need to run receive
                 # TODO
                 pass
-    elif: update.message.chat.type == 'group':
+    elif update.message.chat.type == 'group':
         # increment counter of sent messages
         context.user_data['c'] = cnt + 1
 
@@ -413,11 +413,16 @@ def trackChats(update, Context):
     if chat.type in [Chat.GROUP, Chat.SUPERGROUP]:
         if not was_member and is_member:
             if user_id != context.bot_data.config['admin_id']:
+                logger.debug('Added to the group by someone else than admin, leaving...')
                 bot.leave_chat(chat_id)
+            else:
+                logger.debug('Added to the group by the admin, staying...')
+        else:
+            logger.debug('Left a group...')
 
 
 # track the users of the chats
-def trackChatMembers(update context):
+def trackChatMembers(update, context):
     # get the status change info
     result = extract_status_change(update.chat_member)
     if result is None:

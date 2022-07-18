@@ -1,5 +1,7 @@
 from telegram import ChatMember, ChatMemberUpdated
 
+from typing import Optional, Tuple
+
 
 # ref https://github.com/python-telegram-bot/python-telegram-bot/blob/master/examples/chatmemberbot.py
 def extract_status_change(chat_member_update: ChatMemberUpdated) -> Optional[Tuple[bool, bool]]:

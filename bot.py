@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 
 import argparse
 import logging
-import yaml
+import toml
 import pathlib
 import os
 
@@ -25,7 +25,7 @@ from slateboy.handlers import commandBenchmark, trackChats, trackChatMembers, cl
 def parseConfigFile(filepath):
     if not exists(filepath):
         raise argparse.ArgumentTypeError('Provided configuration file does not exists')
-    if not filepath.endswith('.yml'):
+    if not filepath.endswith('.toml'):
         raise argparse.ArgumentTypeError('Only .yml file types are currently supported for the configuration')
     return filepath
 
@@ -39,7 +39,7 @@ args = parser.parse_args()
 # configuration
 config = None
 with open(args.config) as f:
-    config = yaml.load(f, Loader=yaml.FullLoader)
+    config = toml.load(f)
 
 # logger
 logfile = config['logfile']
@@ -73,7 +73,7 @@ def initiateBot(update, context):
 
 # register handlers
 dp.add_handler(CommandHandler('start', initiateBot))
-dp.add_handler(CommandHandler('donate', commandDoposit))
+dp.add_handler(CommandHandler('donate', commandDeposit))
 dp.add_handler(CommandHandler('withdraw', commandWithdraw))
 dp.add_handler(CommandHandler('approve', commandApprove))
 dp.add_handler(CommandHandler('faucet', commandFaucet))
