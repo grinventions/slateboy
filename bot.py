@@ -69,7 +69,7 @@ dp = updater.dispatcher
 
 # initiation function
 def initiateBot(update, context):
-    context.bot_data['config'].set(config)
+    context.bot_data['config'] = config
 
 # register handlers
 dp.add_handler(CommandHandler('start', initiateBot))

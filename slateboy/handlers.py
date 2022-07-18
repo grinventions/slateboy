@@ -1,4 +1,5 @@
 import functools
+import logging
 import re
 
 from i18n.translator import t
@@ -396,7 +397,9 @@ def commandBenchmark(update, context, ts, cnt, faucet_request_message_id):
 
 
 # track the chats the bot is in
-def trackChats(update, Context):
+def trackChats(update, context):
+    logger = logging.getLogger()
+
     # get the status change info
     result = extract_status_change(update.my_chat_member)
     if result is None:
@@ -404,17 +407,20 @@ def trackChats(update, Context):
     was_member, is_member = result
 
     # get the sender of the message and current chat id
-    chat_id = update.message.chat.id
-    user_id = update.message.from_user.id
+    if not update.my_chat_member:
+        return None
+
+    chat_id = update.my_chat_member.chat.id
+    user_id = update.my_chat_member.from_user.id
 
     # if bot was just added to a new group and it was done
     # by someone else than authorized admin, leave immediately
     chat = update.effective_chat
     if chat.type in [Chat.GROUP, Chat.SUPERGROUP]:
         if not was_member and is_member:
-            if user_id != context.bot_data.config['admin_id']:
+            if user_id != context.bot_data.get('config', {}).get('admin_id', None):
                 logger.debug('Added to the group by someone else than admin, leaving...')
-                bot.leave_chat(chat_id)
+                context.bot.leave_chat(chat_id)
             else:
                 logger.debug('Added to the group by the admin, staying...')
         else:
