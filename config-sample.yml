@@ -5,6 +5,7 @@ bot_name: slateboy
 locale: en
 fallback: en
 logfile: slateboy.log
+loglevel: DEBUG
 min_cnt: 1000
 min_ts: 86400
 req_min_cnt: 1000

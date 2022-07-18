@@ -47,7 +47,7 @@ logging.basicConfig(level=logging.ERROR,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     filename=logfile)
 logger = logging.getLogger()
-logger.setLevel('ERROR')
+logger.setLevel(config.get('loglevel', 'ERROR'))
 
 # translations
 TRANSLATIONS_DIRECTORY = os.path.dirname(os.path.abspath(__file__)) + os.sep + 'translations' + os.sep
