@@ -8,8 +8,21 @@ from telegram import Chat
 from slateboy.status import extract_status_change
 
 
+# decorator indicating human-only method
+def human(func):
+    @functools.wraps(func)
+    def wrapper_human_only(*args, **kwargs):
+        # get update and context objects
+        update = args[0]
+        context = args[1]
+        # processing
+        if update.message.from_user.is_bot:
+            return None
+        return func(*args, **kwargs)
+    return wrapper_human_only
 
-# authentication decorator
+
+# decorator indicating admin-only method
 def admin(func):
     @functools.wraps(func)
     def wrapper_admin_only(*args, **kwargs):
@@ -443,12 +456,14 @@ def trackChatMembers(update context):
     if not was_member and is_member:
         # if member was added, note the timestamp
         ts = update.message.date
-        data = ts, 0, None # timestamp, messages count, faucet request
-        context.bot_data['users'][str(member.id)] = data
+        context.user_data['t'] = ts   # timestamp
+        context.user_data['c'] = 0    # message count
+        context.user_data['f'] = None # faucet request
     elif was_member and not is_member:
         # destroy this user data
-        if str(member.id) in context.bot_data['users'].keys()
-        del context.bot_data['users'][str(member.id)]
+        del context.user_data['t']
+        del context.user_data['c']
+        del context.user_data['f']
 
 
 def cleanUpJob(context):
