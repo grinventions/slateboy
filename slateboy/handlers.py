@@ -40,14 +40,11 @@ def admin(func):
     return wrapper_admin_only
 
 
+@human
 def commandDeposit(update, context):
     # get the sender of the message and current chat id
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
-
-    # if sender is a bot, ignore
-    if update.message.from_user.is_bot:
-        return None
 
     # inform everyone of the donation in progress
     reply_text = t('slateboy.msg_donation_0')
@@ -75,14 +72,11 @@ def commandDeposit(update, context):
         text=reply_text)
 
 
+@human
 def commandWithdraw(update, context):
     # get the sender of the message and current chat id
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
-
-    # if sender is a bot, ignore
-    if update.message.from_user.is_bot:
-        return None
 
     # check if user has a withdrawal request pending
     # user has to have a record
@@ -151,14 +145,11 @@ def commandWithdraw(update, context):
     context.bot_data['withdrawals'][str(user_id)] = cur_ts
 
 
+@human
 def commandFaucet(update, context):
     # get the sender of the message and current chat id
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
-
-    # if sender is a bot, ignore
-    if update.message.from_user.is_bot:
-        return None
 
     # check if user exists
     if str(user_id) not in context.bot_data['users'].keys():
@@ -212,14 +203,11 @@ def commandFaucet(update, context):
         reply_to_message_id=faucet_request)
 
 
+@human
 def commandFaucetStatus(update, context):
     # get the sender of the message and current chat id
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
-
-    # if sender is a bot, ignore
-    if update.message.from_user.is_bot:
-        return None
 
     # check if user exists
     if str(user_id) not in context.bot_data['users'].keys():
@@ -260,14 +248,11 @@ def commandFaucetStatus(update, context):
         reply_to_message_id=update.message.message_id)
 
 
+@human
 def commandFaucetCancel(update, context):
     # get the sender of the message and current chat id
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
-
-    # if sender is a bot, ignore
-    if update.message.from_user.is_bot:
-        return None
 
     # check if user exists
     if str(user_id) not in context.bot_data['users'].keys():
@@ -295,15 +280,11 @@ def commandFaucetCancel(update, context):
         reply_to_message_id=update.message.message_id)
 
 
-
+@human
 def commandApprove(update, context):
     # get the sender of the message and current chat id
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
-
-    # if sender is a bot, ignore
-    if update.message.from_user.is_bot:
-        return None
 
     # check if user responds to another message
     if update.message.reply_to_message is None:
@@ -385,14 +366,11 @@ def commandApprove(update, context):
         reply_to_message_id=update.message.message_id)
 
 
+@human
 def commandBenchmark(update, context):
     # get the sender of the message and current chat id
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
-
-    # if sender is a bot, ignore
-    if update.message.from_user.is_bot:
-        return None
 
     # distinguish DMs from group messages
     if update.message.chat.type == 'private':
