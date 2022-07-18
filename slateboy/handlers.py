@@ -40,6 +40,31 @@ def admin(func):
     return wrapper_admin_only
 
 
+# decorator indicating user is registered
+def registered(func):
+    @functools.wraps(func)
+    def wrapper_faucet(*args, **kwargs):
+        # get update and context objects
+        update = args[0]
+        context = args[1]
+        # processing
+        if 't' not in context.user_data.keys():
+            return None
+        if 'c' not in context.user_data.keys():
+            return None
+        if 'f' not in context.user_data.keys():
+            return None
+
+        # get record
+        ts = context.user_data['t']
+        cnt = context.user_data['c']
+        faucet_request_message_id = context.user_data['f']
+        args = tuple(list(args) + [ts, cnt, faucet_request_message_id])
+
+        return func(*args, **kwargs)
+    return wrapper_human_only
+
+
 @human
 def commandDeposit(update, context):
     # get the sender of the message and current chat id
@@ -73,16 +98,11 @@ def commandDeposit(update, context):
 
 
 @human
-def commandWithdraw(update, context):
+@registered
+def commandWithdraw(update, context, ts, cnt, faucet_request_message_id):
     # get the sender of the message and current chat id
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
-
-    # check if user has a withdrawal request pending
-    # user has to have a record
-    if str(member.id) not in context.bot_data['users'].keys():
-        return None
-    ts, cnt, faucet_request_message_id = context.bot_data['users'][str(user_id)]
 
     if faucet_request_message_id is None:
         reply_text = t('slateboy.msg_missing_faucet_request')
@@ -146,15 +166,11 @@ def commandWithdraw(update, context):
 
 
 @human
-def commandFaucet(update, context):
+@registered
+def commandFaucet(update, context, ts, cnt, faucet_request_message_id):
     # get the sender of the message and current chat id
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
-
-    # check if user exists
-    if str(user_id) not in context.bot_data['users'].keys():
-        return None
-    ts, cnt, faucet_request = context.bot_data['users'][str(user_id)]
 
     # user has to have a certain number of messages sent to the group
     req_min_cnt = context.bot_data['config']['req_min_cnt']
@@ -204,15 +220,11 @@ def commandFaucet(update, context):
 
 
 @human
-def commandFaucetStatus(update, context):
+@registered
+def commandFaucetStatus(update, context, ts, cnt, faucet_request_message_id):
     # get the sender of the message and current chat id
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
-
-    # check if user exists
-    if str(user_id) not in context.bot_data['users'].keys():
-        return None
-    ts, cnt, faucet_request_message_id = context.bot_data['users'][str(user_id)]
 
     if faucet_request_message_id is None:
         reply_text = t('slateboy.msg_missing_faucet_request')
@@ -249,15 +261,11 @@ def commandFaucetStatus(update, context):
 
 
 @human
-def commandFaucetCancel(update, context):
+@registered
+def commandFaucetCancel(update, context, ts, cnt, faucet_request_message_id):
     # get the sender of the message and current chat id
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
-
-    # check if user exists
-    if str(user_id) not in context.bot_data['users'].keys():
-        return None
-    ts, cnt, faucet_request_message_id = context.bot_data['users'][str(user_id)]
 
     if faucet_request_message_id is None:
         reply_text = t('slateboy.msg_missing_faucet_request')
@@ -281,7 +289,8 @@ def commandFaucetCancel(update, context):
 
 
 @human
-def commandApprove(update, context):
+@registered
+def commandApprove(update, context, ts, cnt, faucet_request_message_id):
     # get the sender of the message and current chat id
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
@@ -295,20 +304,14 @@ def commandApprove(update, context):
             reply_to_message_id=update.message.message_id)
 
     # check if there is a record for this message
-    faucet_request_message_id = update.message.reply_to_message
-    faucet_request_message_author = update.message.reply_to_message.from_user.id
-    if str(faucet_request_message_id) not in context.bot_data['requests'].keys():
+    ref_faucet_request_message_id = update.message.reply_to_message
+    ref_faucet_request_message_author = update.message.reply_to_message.from_user.id
+    if str(ref_faucet_request_message_id) not in context.bot_data['requests'].keys():
         reply_text = t('slateboy.msg_missing_faucet_requests')
         return context.bot.send_message(
             chat_id=chat_id,
             text=reply_text,
             reply_to_message_id=update.message.message_id)
-
-    # check if user qualifies to approve requests
-    # user has to have a record
-    if str(member.id) not in context.bot_data['users'].keys():
-        return None
-    ts, cnt, _ = context.bot_data['users'][str(user_id)]
 
     # user has to have a certain number of messages sent to the group
     min_cnt = context.bot_data['config']['min_cnt']
@@ -343,9 +346,7 @@ def commandApprove(update, context):
     max_request_age = context.bot_data['config']['max_request_age']
     if cur_ts - faucet_request_timestamp > max_request_age:
         # delete the faucet request
-        del context.bot_data['requests'][str(faucet_request_message_id)]
-        author_ts, author_cnt, _ = context.bot_data['users'][str(request_author)]
-        context.bot_data['users'][str(request_author)] = author_ts, author_cnt, None
+        del context.bot_data['requests'][str(ref_faucet_request_message_id)]
 
         # inform of the deletion
         reply_text = t('slateboy.msg_expired')
@@ -356,7 +357,7 @@ def commandApprove(update, context):
 
     # looks like user can approve, increase the approval counter
     approvals.append(user_id)
-    context.bot_data['requests'][str(faucet_request_message_id)] = faucet_request_timestamp, request_author, approvals
+    context.bot_data['requests'][str(ref_faucet_request_message_id)] = faucet_request_timestamp, request_author, approvals
 
     # it all went smoothly
     reply_text = t('slateboy.msg_approval_successful')
@@ -367,7 +368,8 @@ def commandApprove(update, context):
 
 
 @human
-def commandBenchmark(update, context):
+@registered
+def commandBenchmark(update, context, ts, cnt, faucet_request_message_id):
     # get the sender of the message and current chat id
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
@@ -390,9 +392,7 @@ def commandBenchmark(update, context):
                 pass
     elif: update.message.chat.type == 'group':
         # increment counter of sent messages
-        if str(user_id) in context.bot_data['users'].keys():
-            ts, cnt, faucet_request = context.bot_data['users'][str(user_id)]
-            context.bot_data['users'][str(user_id)] = ts, cnt+1, faucet_request
+        context.user_data['c'] = cnt + 1
 
 
 # track the chats the bot is in
