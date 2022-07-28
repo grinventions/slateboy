@@ -13,3 +13,7 @@ pip install -r requirements
 ```sh
 python bot.py --config path/to/your/config.yml
 ```
+
+## References
+
+1. [how to access user context from a scheduled job](https://github.com/python-telegram-bot/python-telegram-bot/issues/3175)
