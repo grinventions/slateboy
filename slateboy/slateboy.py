@@ -57,6 +57,27 @@ def default_callback_withdraw_lock(self, update, context, amount, txid):
     return success, reason
 
 
+# by default, we lock the user balance in the user context
+def default_callback_deposit_lock(self, update, context, amount, txid):
+    # get the balance
+    success, reason, balance = self.callback_balance(update, context)
+    if not success:
+        # probably data was not correctly initiated, break!
+        return success, reason
+
+    # check if user has balance
+    spendable, confirming, locked = balance
+
+    # lock
+    balance = spendable, confirming, locked + amount
+    context.user_data[self.namespace]['balance'] = balance
+    context.user_data[self.namespace]['txs'].append(txid)
+
+    success = True
+    reason = None
+    return success, reason
+
+
 
 # by default we withdraw from the user context if there is sufficient balance
 def default_callback_withdraw(self, update, context, requested_amount):
@@ -197,7 +218,45 @@ class SlateBoy:
 
 
     def handlerRequestDeposit(self, update, context):
-        pass
+        chat_id = update.message.chat.id
+
+        # get the amount if provided
+        deposited_amount = None
+        if len(context.args) > 0:
+            try:
+                deposited_amount = float(context.args[0])
+            except ValueError:
+                reply_text = t('slateboy.msg_deposit_invalid_amount').format(
+                    context.args[0])
+                return update.context.bot.send_message(
+                    chat_id=chat_id, text=reply_text)
+
+        # check if user can deposit
+        approved, reason = self.callback_deposit(update, context, offered_amount)
+
+        if not approved:
+            return update.context.bot.send_message(chat_id=chat_id, text=reason)
+
+        # proceed with the deposit
+        if deposited_amount is None:
+            # send instructions to the user for the SRS flow
+            reply_text = t('slateboy.msg_deposit_srs_instructions')
+            return update.context.bot.send_message(chat_id=chat_id, text=reply_text)
+
+        # send instructions to the user for the RSR
+        success, slatepack, txid = self.walletReceipt(deposited_amount)
+        if not success:
+            reply_text = t('slateboy.msg_deposit_rsr_wallet_error')
+            return update.context.bot.send_message(chat_id=chat_id, text=reply_text)
+
+        # lock the amount
+        success, reason = self.callback_deposit_lock(update, context, deposited_amount, txid)
+        if not success:
+            return update.context.bot.send_message(chat_id=chat_id, text=reason)
+
+        update.context.bot.send_message(chat_id=chat_id, text=slatepack)
+        reply_text = t('slateboy.msg_deposit_rsr_instructions')
+        update.context.bot.send_message(chat_id=chat_id, text=reply_text)
 
 
     def handlerBalance(self, update, context):
