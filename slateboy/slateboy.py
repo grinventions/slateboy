@@ -1,6 +1,8 @@
 from __future__ import unicode_literals
 
-from telegram.ext import Updater, CommandHandler
+import re
+
+from telegram.ext import Updater, CommandHandler, MessageHandler
 from i18n.translator import t
 
 
@@ -78,6 +80,25 @@ def default_callback_deposit_lock(self, update, context, amount, txid):
     return success, reason
 
 
+# by default, we check if txid is in the user context
+def default_is_txid_known(self, update, context, txid):
+    found = False
+
+    # get the balance
+    success, reason, balance = self.callback_balance(update, context)
+    if not success:
+        # probably data was not correctly initiated, break!
+        return success, reason, found
+
+    # check if txid is known
+    if txid in context.user_data[self.namespace]['txs']:
+        found = True
+
+    success = True
+    reason = None
+    return success, reason, found
+
+
 
 # by default we withdraw from the user context if there is sufficient balance
 def default_callback_withdraw(self, update, context, requested_amount):
@@ -138,7 +159,8 @@ class SlateBoy:
                  callback_balance=default_balance,
                  callback_withdraw=default_callback_withdraw,
                  callback_withdraw_lock=default_callback_withdraw_lock,
-                 callback_deposit=default_callback_deposit):
+                 callback_deposit=default_callback_deposit,
+                 callback_is_txid_known=default_is_txid_known):
         self.name = name
         self.api_key = api_key
         self.namespace = namespace
@@ -148,6 +170,7 @@ class SlateBoy:
         self.callback_withdraw = callback_withdraw
         self.callback_withdraw_lock = callback_withdraw_lock
         self.callback_deposit = callback_deposit
+        self.callback_is_txid_known = callback_is_txid_known
 
 
     def initiate(self):
@@ -158,6 +181,10 @@ class SlateBoy:
             CommandHandler('deposit', self.handlerRequestDeposit))
         self.updater.dispatcher.add_handler(
             CommandHandler('balance', self.handlerBalance))
+
+        # for handling slatepacks
+        self.updater.dispatcher.add_handler(
+            MessageHandler(Filters.text, self.genericTextHandler))
 
 
     def run(self):
@@ -275,7 +302,62 @@ class SlateBoy:
         update.context.bot.send_message(chat_id=chat_id, text=reply_text)
 
 
+    def genericTextHandler(self, update, context):
+        chat_id = update.message.chat.id
+        message_id = update.message.message_id
+
+        # distinguish DMs from group messages
+        if update.message.chat.type == 'private':
+            # check if it is a slatepack
+            regex = 'BEGINSLATEPACK[\\s\\S]*\\sENDSLATEPACK'
+            matches = re.search(regex, update.message.text, flags=re.DOTALL)
+            if matches is not None:
+                slatepack = matches.group(0)
+
+                # check the meaning of the slatepack
+                slate = self.walletDecodeSlatepack(slatepack)
+                txid = slate.get('id', -1)
+                if not self.callback_is_txid_known(update, context, txid):
+                    reply_text = t('slateboy.msg_unknown_slatepack')
+                    return update.context.bot.send_message(
+                        chat_id=chat_id, text=reply_text,
+                        reply_to_message_id=message_id)
+
+                sta = slate.get('sta', -1)
+                # slatepack is known, is this srs flow?
+                if sta == 'S1':
+                    # this is a deposit attempt
+                    # TODO run receive
+                    # TODO return instructions and response slatepack
+                    return None
+
+                if sta == 'S2':
+                    # this is response to withdrawal
+                    # TODO run finalize
+                    # TODO return instructions
+                    return None
+
+                if sta == 'I1':
+                    # user sent us an invoice, we ignore
+                    # TODO inform user we do not pay invoices
+                    return None
+
+                if sta == 'I2':
+                    # user has responded to our invoice
+                    # this is deposit
+                    # TODO run finalize
+                    # TODO return instructions
+                    return None
+
+                # TODO inform user of reception of an invalid status code
+                return None
+
+
     # GRIN wallet methods
+    def walletDecodeSlatepack(self, slatepack):
+        # TODO
+        pass
+
     def walletQuerySpendable(self):
         # TODO
         pass
