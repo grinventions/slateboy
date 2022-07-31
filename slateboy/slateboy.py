@@ -260,7 +260,19 @@ class SlateBoy:
 
 
     def handlerBalance(self, update, context):
-        pass
+        chat_id = update.message.chat.id
+
+        # get the balance
+        success, reason, balance = self.callback_balance(update, context)
+        if not success:
+            # probably data was not correctly initiated, break!
+            return update.context.bot.send_message(chat_id=chat_id, text=reason)
+
+        spendable, confirming, locked = balance
+
+        reply_text = t('slateboy.msg_balance').format(
+            str(spendable), str(confirming), str(locked))
+        update.context.bot.send_message(chat_id=chat_id, text=reply_text)
 
 
     # GRIN wallet methods
