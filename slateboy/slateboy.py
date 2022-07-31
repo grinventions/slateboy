@@ -5,6 +5,15 @@ import re
 from telegram.ext import Updater, CommandHandler, MessageHandler
 from i18n.translator import t
 
+from datetime import datetime, timezone
+
+
+def getNow():
+    dt = datetime.now(timezone.utc)
+    utc_time = dt.replace(tzinfo=timezone.utc)
+    cur_ts = utc_time.timestamp()
+    return cur_ts
+
 
 # by default, we store user balance in the user context
 def default_balance(self, update, context):
@@ -99,7 +108,6 @@ def default_is_txid_known(self, update, context, txid):
     return success, reason, found
 
 
-
 # by default we withdraw from the user context if there is sufficient balance
 def default_callback_withdraw(self, update, context, requested_amount):
     approved = False
@@ -154,13 +162,104 @@ def default_callback_deposit(self, update, context, offered_amount):
     return approved, reason
 
 
+# by default just iterate users context
+def default_callback_job_txs(self, context, callback_function_tx, config_job_txs):
+    found_confirmed = {}
+
+    # iterate over users
+    for user_id, user_data in context.dispatcher.user_data.items():
+        for txid in user_data[self.namespace]['txs']:
+            # the callback function will inform
+            status, operation, amount = callback_function_tx(txid)
+
+            # should it be removed?
+            if status in ['confirmed', 'canceled']:
+                if user_id not in found_confirmed.keys():
+                    found_confirmed[user_id] = []
+                found_confirmed[user_id].append(txid)
+
+            # check how the balance should be updated
+            spendable, confirming, locked = user_data['balance']
+            updated_balance = None
+
+            if status == 'confirmed' and operation == 'deposit':
+                updated_balance = spendable + amount, confirming - amount, locked
+
+            if status == 'confirmed' and operation == 'withdrawal':
+                updated_balance = spendable, confirming, locked - amount
+
+            if status == 'canceled' and operation == 'deposit':
+                updated_balance = spendable, confirming - amount, locked
+
+            if status == 'canceled' and operation == 'withdrawal':
+                updated_balance = spendable + amount, confirming, locked - amount
+
+            context.dispatcher.user_data['balance'] = updated_balance
+
+    # clean-up
+    for user_id, confirmed_transactions in found_confirmed.items():
+        for txid in confirmed_transactions:
+            context.dispatcher.user_data[user_id]['txs'].remove(txid)
+
+
+# by default we charge monthly fee to anyone who has balance higher than certain
+# threshold, this will force users to not use the bot as their wallet
+# and make them withdraw often
+def default_callback_job_accounting(self, context, config_job_accounting):
+    accounting_max_free_balance = config_job_accounting.get('max_free_balance', 10.0)
+    accounting_period = config_job_accounting.get('period', 2629800)
+    accounting_period_warning = config_job_accounting.get('period_warning', 2160000)
+    accounting_monthly_charge = config_job_accounting.get('monthly_charge', 1.0)
+
+    now = getNow()
+
+    # check users
+    for user_id, user_data in context.dispatcher.user_data.items():
+        ts = user_data['ts']
+        spendable, confirming, locked = user_data['balance']
+        if spendable + confirming > accounting_max_free_balance:
+            warned = user_data.get('warned', False)
+            if accounting_period_warning < now - ts < accounting_monthly_charge:
+                if not warned:
+                    reply_text = t('slateboy.msg_free_balance_warning').format(
+                        str(spendable + confirming),
+                        str(spendable),
+                        str(confirming),
+                        str(locked),
+                        str(accounting_max_free_balance))
+                    context.bot.send_message(
+                        chat_id=user_id,
+                        text=reply_text)
+                    context.dispatcher.user_data[user_id]['warned'] = True
+            elif accounting_monthly_charge <= now - ts:
+                if not warned:
+                    reply_text = t('slateboy.msg_free_balance_exceeded').format(
+                        str(spendable + confirming),
+                        str(spendable),
+                        str(confirming),
+                        str(locked),
+                        str(accounting_max_free_balance))
+                    context.bot.send_message(
+                        chat_id=user_id,
+                        text=reply_text)
+                    context.dispatcher.user_data[user_id]['warned'] = spendable - accounting_monthly_charge, confirming, locked
+                    context.bot.bot_data['charged'] += accounting_monthly_charge
+                    del context.dispatcher.user_data[user_id]['warned']
+
+
 class SlateBoy:
     def __init__(self, name, api_key, namespace,
                  callback_balance=default_balance,
                  callback_withdraw=default_callback_withdraw,
                  callback_withdraw_lock=default_callback_withdraw_lock,
                  callback_deposit=default_callback_deposit,
-                 callback_is_txid_known=default_is_txid_known):
+                 callback_is_txid_known=default_is_txid_known,
+                 callback_job_txs=default_callback_job_txs,
+                 callback_job_accounting=default_callback_job_accounting,
+                 frequency_job_txs=600,
+                 frequency_job_accounting=3600,
+                 config_job_txs={},
+                 config_job_accounting={}):
         self.name = name
         self.api_key = api_key
         self.namespace = namespace
@@ -172,8 +271,21 @@ class SlateBoy:
         self.callback_deposit = callback_deposit
         self.callback_is_txid_known = callback_is_txid_known
 
+        # register jobs
+        self.callback_job_txs = callback_job_txs
+        self.callback_job_accounting = callback_job_accounting
+
+        # job parameters
+        self.frequency_job_txs = frequency_job_txs
+        self.frequency_job_accounting = frequency_job_accounting
+
+        # configs
+        self.config_job_txs = config_job_txs
+        self.config_job_accounting = config_job_accounting
+
 
     def initiate(self):
+        # command callbacks
         self.updater = Updater(self.api_key, use_context=True)
         self.updater.dispatcher.add_handler(
             CommandHandler('withdraw', self.handlerRequestWithdraw))
@@ -182,9 +294,17 @@ class SlateBoy:
         self.updater.dispatcher.add_handler(
             CommandHandler('balance', self.handlerBalance))
 
-        # for handling slatepacks
+        # regular message for handling slatepacks
         self.updater.dispatcher.add_handler(
             MessageHandler(Filters.text, self.genericTextHandler))
+
+        # jobs
+        self.updater.job_queue.run_repeating(
+            self.jobTXs, interval=self.frequency_job_txs,
+            first=frequency_job_txs)
+        self.updater.job_queue.run_repeating(
+            self.jobAccounting, interval=self.frequency_job_accounting,
+            first=frequency_job_accounting)
 
 
     def run(self):
@@ -353,7 +473,21 @@ class SlateBoy:
                 return None
 
 
+    def jobTXs(self, context):
+        self.callback_job_txs(context, self.walletQueryConfirmed, self.config_job_txs)
+
+
+    def jobAccounting(self, context):
+        self.callback_job_accounting(context, self.config_job_accounting)
+
+
     # GRIN wallet methods
+    def walletQueryConfirmed(self, txid):
+        # TODO
+        # status is confirmed, confirming or canceled
+        # operation deposit or withdrawal
+        return status, operation, 0
+
     def walletDecodeSlatepack(self, slatepack):
         # TODO
         pass
