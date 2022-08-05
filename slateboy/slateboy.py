@@ -5,19 +5,24 @@ import re
 from telegram.ext import Updater, CommandHandler, MessageHandler
 from i18n.translator import t
 
+from slateboy.defaults import default_is_bank_balance_initiated
+from slateboy.defaults import default_is_user_balance_initiated
+
 from slateboy.defaults import default_balance
 from slateboy.defaults import default_callback_withdraw_lock
 from slateboy.defaults import default_callback_deposit_lock
 from slateboy.defaults import default_is_txid_known
 from slateboy.defaults import default_callback_withdraw
 from slateboy.defaults import default_callback_deposit
+
 from slateboy.defaults import default_callback_job_txs
 from slateboy.defaults import default_callback_job_accounting
 
 
-
 class SlateBoy:
     def __init__(self, name, api_key, namespace,
+                 callback_is_bank_balance_initiated=default_is_bank_balance_initiated,
+                 callback_is_user_balance_initiated=default_is_user_balance_initiated,
                  callback_balance=default_balance,
                  callback_withdraw=default_callback_withdraw,
                  callback_withdraw_lock=default_callback_withdraw_lock,
@@ -34,6 +39,8 @@ class SlateBoy:
         self.namespace = namespace
 
         # register callbacks
+        self.callback_is_bank_balance_initiated = callback_is_bank_balance_initiated
+        self.callback_is_user_balance_initiated = callback_is_user_balance_initiated
         self.callback_balance = callback_balance
         self.callback_withdraw = callback_withdraw
         self.callback_withdraw_lock = callback_withdraw_lock

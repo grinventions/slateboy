@@ -3,16 +3,33 @@ from i18n.translator import t
 from slateboy.helpers import getNow
 
 
-# by default, we store user balance in the user context
-def default_balance(self, update, context):
-    # spendable, confirming, locked
-    default_balance = (0, 0, 0)
+def default_is_bank_balance_initiated(self, update, context):
+    # check if context initiated
+    if self.namespace not in context.bot_data.keys():
+        success = False
+        reason = t('slateboy.msg_missing_bot_context')
+        return success, reason
 
+    bot_data = context.bot_data[self.namespace]
+
+    # check if bot has balance initiated
+    if 'balance' not in bot_data.keys():
+        success = False
+        reason = t('slateboy.msg_missing_bot_context')
+        return success, reason
+
+    # everything is there
+    success = True
+    reason = None
+    return success, reason
+
+
+def default_is_user_balance_initiated(self, update, context):
     # check if context initiated
     if self.namespace not in context.user_data.keys():
         success = False
         reason = t('slateboy.msg_missing_user_context')
-        return success, reason, default_balance
+        return success, reason
 
     user_data = context.user_data[self.namespace]
 
@@ -20,13 +37,68 @@ def default_balance(self, update, context):
     if 'balance' not in user_data.keys():
         success = False
         reason = t('slateboy.msg_missing_user_context')
-        return success, reason, default_balance
+        return success, reason
 
-    # check if user has balance initiated
+    # check if user has transactions initiated
     if 'txs' not in user_data.keys():
         success = False
         reason = t('slateboy.msg_missing_user_context')
-        return success, reason, default_balance
+        return success, reason
+
+    # everything is there
+    success = True
+    reason = None
+    return success, reason
+
+
+def default_initiate_bank_balance(self, update, context):
+    # check if context initiated
+    is_initiated, _ = self.callback_is_bot_balance_initiated(update, context)
+    if is_initiated:
+        success = False
+        reason = t('slateboy.msg_bot_context_already_initiated')
+        return success, reason
+
+    # spendable, confirming, locked
+    _default_balance = 0
+    context.user_data[self.namespace]['balance'] = _default_balance
+
+    # done
+    success = True
+    reason = None
+    return success, reason
+
+
+def default_initiate_user_balance(self, update, context):
+    # check if context initiated
+    is_initiated, _ = self.callback_is_user_balance_initiated(update, context)
+    if is_initiated:
+        success = False
+        reason = t('slateboy.msg_user_context_already_initiated')
+        return success, reason
+
+    # spendable, confirming, locked
+    _default_balance = (0, 0, 0)
+
+    context.user_data[self.namespace]['balance'] = _default_balance
+    context.user_data[self.namespace]['txs'] = []
+
+    # done
+    success = True
+    reason = None
+    return success, reason
+
+
+# by default, we store user balance in the user context
+def default_balance(self, update, context):
+    # spendable, confirming, locked
+    _default_balance = (0, 0, 0)
+
+    # check if context initiated
+    is_initiated, reason = self.callback_is_user_balance_initiated(update, context)
+    if not is_initiated:
+        success = False
+        return success, reason, _default_balance
 
     # all the data is there
     success = True
