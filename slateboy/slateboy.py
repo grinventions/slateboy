@@ -5,9 +5,14 @@ import re
 from telegram.ext import Updater, CommandHandler, MessageHandler
 from i18n.translator import t
 
+# default context checkers and initiators
 from slateboy.defaults import default_is_bank_balance_initiated
-from slateboy.defaults import default_is_user_balance_initiated
+from slateboy.defaults import default_initiate_bank_balance
 
+from slateboy.defaults import default_is_user_balance_initiated
+from slateboy.defaults import default_initiate_user_balance
+
+# default methods for handling operations
 from slateboy.defaults import default_balance
 from slateboy.defaults import default_callback_withdraw_lock
 from slateboy.defaults import default_callback_deposit_lock
@@ -15,14 +20,22 @@ from slateboy.defaults import default_is_txid_known
 from slateboy.defaults import default_callback_withdraw
 from slateboy.defaults import default_callback_deposit
 
+# default job handling
 from slateboy.defaults import default_callback_job_txs
 from slateboy.defaults import default_callback_job_accounting
+
+# policy configuration values
+from slateboy.values import ContextUserInitiate
+from slateboy.values import ContextUserDestroy
+from slateboy.values import TermsAndConditionsApproval
 
 
 class SlateBoy:
     def __init__(self, name, api_key, namespace,
                  callback_is_bank_balance_initiated=default_is_bank_balance_initiated,
+                 callback_initiate_bank_balance=default_initiate_bank_balance,
                  callback_is_user_balance_initiated=default_is_user_balance_initiated,
+                 callback_initiate_user_balance=default_initiate_user_balance,
                  callback_balance=default_balance,
                  callback_withdraw=default_callback_withdraw,
                  callback_withdraw_lock=default_callback_withdraw_lock,
@@ -40,7 +53,11 @@ class SlateBoy:
 
         # register callbacks
         self.callback_is_bank_balance_initiated = callback_is_bank_balance_initiated
+        self.callback_initiate_bank_balance = callback_initiate_bank_balance
+
         self.callback_is_user_balance_initiated = callback_is_user_balance_initiated
+        self.callback_initiate_user_balance = callback_initiate_user_balance
+
         self.callback_balance = callback_balance
         self.callback_withdraw = callback_withdraw
         self.callback_withdraw_lock = callback_withdraw_lock
