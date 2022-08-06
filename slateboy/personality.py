@@ -2,6 +2,10 @@ class BlankPersonality:
     def __init__(self, slateboy):
         self.slateboy = slateboy
 
+    # getting the balance
+    def getBalance(self, update, context):
+        pass
+
     # deposit behavior
     def canDeposit(self, update, context):
         pass
