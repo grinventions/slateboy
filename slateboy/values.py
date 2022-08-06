@@ -1,18 +1,15 @@
 from enum import Enum
 
 
-class ContextUserInitiate(Enum):
-    MESSAGE = 0
-    JOIN = 1
+class UserBehavior(Enum):
+    JOIN_GROUP = 0
+    LEAVE_GROUP = 1
+    DIRECT_MESSAGE = 2
+    GROUP_MESSAGE = 3
+    REQUEST_DEPOSIT = 4
+    REQUEST_DEPOSIT_FIRST_TIME = 5
+    INACTIVITY = 6
 
 
-class ContextUserDestroy(Enum):
-    NEVER = 0
-    LEFT_WITHOUT_BALANCE = 1
-    INACTIVITY_WITHOUT_BALANCE = 2
-
-
-class TermsAndConditionsApproval(Enum):
-    NEVER = 0
-    FIRST_DEPOSIT = 1
-    EVERY_DEPOSIT = 2
+class BotBehavior(Enum):
+    LAUNCHED = 0

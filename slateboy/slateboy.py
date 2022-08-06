@@ -25,13 +25,15 @@ from slateboy.defaults import default_callback_job_txs
 from slateboy.defaults import default_callback_job_accounting
 
 # policy configuration values
-from slateboy.values import ContextUserInitiate
-from slateboy.values import ContextUserDestroy
-from slateboy.values import TermsAndConditionsApproval
+from slateboy.values import UserBehavior, BotBehavior
 
 
 class SlateBoy:
     def __init__(self, name, api_key, namespace,
+                 # policy
+                 policy_user_context_attempt_create=[UserBehavior.REQUEST_DEPOSIT],
+                 policy_user_context_attempt_destroy=[UserBehavior.INACTIVITY],
+                 # callbacks
                  callback_is_bank_balance_initiated=default_is_bank_balance_initiated,
                  callback_initiate_bank_balance=default_initiate_bank_balance,
                  callback_is_user_balance_initiated=default_is_user_balance_initiated,
@@ -50,6 +52,10 @@ class SlateBoy:
         self.name = name
         self.api_key = api_key
         self.namespace = namespace
+
+        # set the policy
+        self.policy_user_context_create = policy_user_context_create
+        self.policy_user_context_attempt_destroy = policy_user_context_attempt_destroy
 
         # register callbacks
         self.callback_is_bank_balance_initiated = callback_is_bank_balance_initiated

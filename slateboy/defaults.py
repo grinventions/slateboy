@@ -89,6 +89,11 @@ def default_initiate_user_balance(self, update, context):
     return success, reason
 
 
+def default_attempt_destroy_user_balance(self, context):
+    pass
+
+
+
 # by default, we store user balance in the user context
 def default_balance(self, update, context):
     # spendable, confirming, locked
@@ -277,6 +282,8 @@ def default_callback_job_accounting(self, context, config_job_accounting):
     for user_id, user_data in context.dispatcher.user_data.items():
         ts = user_data['ts']
         spendable, confirming, locked = user_data['balance']
+
+        # handle billing for custodian services
         if spendable + confirming > accounting_max_free_balance:
             warned = user_data.get('warned', False)
             if accounting_period_warning < now - ts < accounting_monthly_charge:
@@ -305,3 +312,20 @@ def default_callback_job_accounting(self, context, config_job_accounting):
                     context.dispatcher.user_data[user_id]['warned'] = spendable - accounting_monthly_charge, confirming, locked
                     context.bot.bot_data['charged'] += accounting_monthly_charge
                     del context.dispatcher.user_data[user_id]['warned']
+
+    # handle inactive user context
+    if UserBehavior.INACTIVITY in self.policy_user_context_attempt_destroy:
+        accounting_balanceless_inactivity = config_job_accounting.get('balanceless_inactivity', 3600)
+        balanceless = []
+        for user_id, user_data in context.dispatcher.user_data.items():
+            ts = user_data['ts']
+            spendable, confirming, locked = user_data['balance']
+
+            if spendable == 0 and confirming == 0 and locked == 0 and now - ts > accounting_balanceless_inactivity:
+                balanceless.append(user_id)
+
+        # attempt removal of the balanceless users context
+        for user_id in balanceless:
+            # TODO here attempt to destroy the user context
+            pass
+
