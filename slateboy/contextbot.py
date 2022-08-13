@@ -332,22 +332,41 @@ class ContextBlankPersonality(BlankPersonality):
         return success, reason, reply_text
 
     # withdraw behavior
-    def canWithdraw(self, update, context, amount):
+    def canWithdraw(self, update, context, requested_amount, maximum=False):
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
 
-        is_initiated, _ = self.isUserContextInitiated(context, user_id)
+        is_initiated, reason = self.isUserContextInitiated(context, user_id)
         if not is_initiated:
-            return False
+            success = False
+            result = None
+            approved_amount = None
+            return success, reason, approved_amount
 
         success, reason, balance = getUserBalance(self, context, user_id)
         spendable, awaiting_confirmation, awaiting_finalization, locked = balance
-        result = amount < spendable
+
+        if maximum:
+            success = True
+            reason = None
+            result = True
+            approved_amount = spendable
+            return success, reason, approved_amount
+
+        if requested_amount > spendable:
+            success = True
+            reason = None
+            result = False
+            approved_amount = spendable
+            return success, reason, result, approved_amount
+
+        result = True
+        approved_amount = requested_amount
 
         # all done!
         success = True
         reason = None
-        return success, reason, result
+        return success, reason, result, approved_amount
 
     def assignWithdrawTx(self, update, context, amount, tx_id):
         # get the user_id
@@ -526,8 +545,12 @@ class ContextBlankPersonality(BlankPersonality):
     def shouldIgnore(self, update, context):
         # is the message coming from a bot?
         if update.message.from_user.is_bot:
-            return True
+            ignore = True
+            reason = t('slateboy.msg_rejecting_bots')
+            return ignore, reason
 
         # seems like we can let this flow continue...
         # all done!
-        return False
+        ignore = False
+        reason = None
+        return ignore, reason

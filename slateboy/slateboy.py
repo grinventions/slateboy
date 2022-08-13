@@ -29,81 +29,67 @@ from slateboy.values import UserBehavior, BotBehavior
 
 
 class SlateBoy:
-    def __init__(self, name, api_key, namespace,
-                 # policy
-                 policy_user_context_attempt_create=[UserBehavior.REQUEST_DEPOSIT],
-                 policy_user_context_attempt_destroy=[UserBehavior.INACTIVITY],
-                 # callbacks
-                 callback_is_bank_balance_initiated=default_is_bank_balance_initiated,
-                 callback_initiate_bank_balance=default_initiate_bank_balance,
-                 callback_is_user_balance_initiated=default_is_user_balance_initiated,
-                 callback_initiate_user_balance=default_initiate_user_balance,
-                 callback_balance=default_balance,
-                 callback_withdraw=default_callback_withdraw,
-                 callback_withdraw_lock=default_callback_withdraw_lock,
-                 callback_deposit=default_callback_deposit,
-                 callback_is_txid_known=default_is_txid_known,
-                 callback_job_txs=default_callback_job_txs,
-                 callback_job_accounting=default_callback_job_accounting,
-                 frequency_job_txs=600,
-                 frequency_job_accounting=3600,
-                 config_job_txs={},
-                 config_job_accounting={}):
+    def __init__(self, name, api_key, personality, config={}):
         self.name = name
         self.api_key = api_key
         self.namespace = namespace
 
-        # set the policy
-        self.policy_user_context_create = policy_user_context_create
-        self.policy_user_context_attempt_destroy = policy_user_context_attempt_destroy
+        # configuration
+        self.config = config
 
-        # register callbacks
-        self.callback_is_bank_balance_initiated = callback_is_bank_balance_initiated
-        self.callback_initiate_bank_balance = callback_initiate_bank_balance
-
-        self.callback_is_user_balance_initiated = callback_is_user_balance_initiated
-        self.callback_initiate_user_balance = callback_initiate_user_balance
-
-        self.callback_balance = callback_balance
-        self.callback_withdraw = callback_withdraw
-        self.callback_withdraw_lock = callback_withdraw_lock
-        self.callback_deposit = callback_deposit
-        self.callback_is_txid_known = callback_is_txid_known
-
-        # register jobs
-        self.callback_job_txs = callback_job_txs
-        self.callback_job_accounting = callback_job_accounting
-
-        # job parameters
-        self.frequency_job_txs = frequency_job_txs
-        self.frequency_job_accounting = frequency_job_accounting
-
-        # configs
-        self.config_job_txs = config_job_txs
-        self.config_job_accounting = config_job_accounting
+        # register the personality instance
+        self.personality = personality
 
 
     def initiate(self):
+        # relevant configs
+        frequency_job_txs = self.config.get('frequency_job_txs', 600)
+        first_job_txs = self.config.get('first_job_txs', 60)
+
+        frequency_wallet_sync = self.config.get('frequency_wallet_sync', 600)
+        first_wallet_sync = self.config.get('first_wallet_sync', 5)
+
+        # check if personality requested to update standard command names
+        names = self.personality.renameStandardCommands()
+
         # command callbacks
         self.updater = Updater(self.api_key, use_context=True)
         self.updater.dispatcher.add_handler(
-            CommandHandler('withdraw', self.handlerRequestWithdraw))
+            CommandHandler(names.get('withdraw', 'withdraw'),
+                           self.handlerRequestWithdraw))
         self.updater.dispatcher.add_handler(
-            CommandHandler('deposit', self.handlerRequestDeposit))
+            CommandHandler(names.get('deposit', 'deposit'),
+                           self.handlerRequestDeposit))
         self.updater.dispatcher.add_handler(
-            CommandHandler('balance', self.handlerBalance))
+            CommandHandler(names.get('balance', 'balance'),
+                           self.handlerBalance))
 
-        # regular message for handling slatepacks
+        # register custom commands
+        custom_commands = self.personality.registerCustomCommands()
+        for command, function in custom_commands:
+            self.updater.dispatcher.add_handler(
+                CommandHandler(command, function))
+
+        # regular message for handling slatepacks and other logic
         self.updater.dispatcher.add_handler(
             MessageHandler(Filters.text, self.genericTextHandler))
 
-        # jobs
+        # transaction status update job for deposits and withdrawals
         self.updater.job_queue.run_repeating(
             self.jobTXs, interval=self.frequency_job_txs,
-            first=frequency_job_txs)
+            first=first_job_txs)
+
+        # wallet refresh job for keeping it in sync
         self.updater.job_queue.run_repeating(
-            self.jobAccounting, interval=self.frequency_job_accounting,
-            first=frequency_job_accounting)
+            self.jobWalletSynce, interval=self.frequency_wallet_sync,
+            first=first_wallet_sync)
+
+        # register custom jobs requested by the personality
+        custom_jobs = registerCustomJobs()
+        for fist_interval, frequency, function in custom_jobs:
+            self.updater.job_queue.run_repeating(
+                function, interval=frequency,
+                first=first_interval)
 
 
     def run(self):
@@ -112,13 +98,32 @@ class SlateBoy:
 
 
     def handlerRequestWithdraw(self, update, context):
+        # get the user_id
         chat_id = update.message.chat.id
 
+        # check if wallet is operations
+        is_wallet_ready, reason = self.isWalletReady()
+        if not is_wallet_ready:
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
+
+        # check if personality wishes to reject this flow
+        ignore, reason = self.personality.shouldIgnore(update, context)
+        if ignore:
+            if reason is not None:
+                return update.context.bot.send_message(
+                    chat_id=chat_id, text=reason)
+            # unknown reason but still ordered to ignore
+            reply_text = t('slateboy.msg_ignored_unknown')
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
+
         # validate the request amount
-        requested_amount = 'max'
+        is_maximum_request = False
+        requested_amount = None
+
         if len(context.args) == 0:
-            reply_text = t('slateboy.msg_withdraw_missing_amount')
-            return update.context.bot.send_message(chat_id=chat_id, text=reply_text)
+            is_maximum_request = True
         else:
             try:
                 requested_amount = float(context.args[0])
@@ -128,97 +133,80 @@ class SlateBoy:
                 return update.context.bot.send_message(
                     chat_id=chat_id, text=reply_text)
 
-        # check if user can withdraw
-        approved, reason, maximum = self.callback_withdraw(
-            self, update, context, requested_amount)
+        # consult the personality
+        success, reason, result, approved_amount = self.personality.canWithdraw(
+            update, context, requested_amount, maximum=is_maximum_request)
 
-        if not approved:
-            return update.context.bot.send_message(chat_id=chat_id, text=reason)
+        # check if user has requested too much?
+        if not result and reason is None and approved_amount is not None:
+            reply_text = t('slateboy.msg_withdraw_balance_exceeded').format(
+                str(requested_amount), str(approved_amount))
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reply_text)
 
-        # approved, we can prepare the transaction
-        spending = maximum
-        if requested_amount != 'max':
-            spending = requested_amount
+        # there might have been custom logic reason why the personality
+        # has decided to reject this request
+        if not result and reason is not None:
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
 
-        # check if there are locked outputs
-        spendable = self.walletQuerySpendable()
-        if spending > spendable:
-            reply_text = t('slateboy.msg_withdraw_locked')
-            return update.context.bot.send_message(chat_id=chat_id, text=reply_text)
+        # rejected for unknown reasons
+        if not result:
+            reply_text = t('slateboy.msg_withdraw_rejected_unknown')
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reply_text)
 
-        # perform the transaction
-        success, slatepack, txid = self.walletWithdraw()
+        # if reached here, it means it is approved
+        # perform the invoice flow
+        success, reason, slatepack, tx_id = self.walletInvoice(approved_amount)
+
+        # check if for some reason it has failed,
+        # example reason could be all the outputs are locked at the moment
         if not success:
-            reply_text = t('slateboy.msg_withdraw_wallet_error')
-            return update.context.bot.send_message(chat_id=chat_id, text=reply_text)
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
 
-        # lock the amount
-        success, reason = self.callback_withdraw_lock(update, context, spending, txid)
+        # let the personality assign this tx_id
+        success, reason, send_instructions, msg = self.personality.assignWithdrawTx(
+            update, context, approved_amount, tx_id)
+
+        # did it not work for some reason?
         if not success:
-            return update.context.bot.send_message(chat_id=chat_id, text=reason)
+            # release the locked outputs
+            self.walletReleaseLock(tx_id)
 
-        # proceed with the slatepack exchange
+            # inform the user of the failure
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
+
+        # check if personality wants withdrawal instruction send
+        if send_instructions:
+            reply_text = t('slateboy.msg_withdraw_instructions')
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reply_text)
+
+        # send slatepack and or message from the personality
+        if '{slatepack}' in msg:
+            replyt_text = msg.format(slatepack)
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
+
+        # personality did not specify how to format the slatepack
+        # sending it separately
         update.context.bot.send_message(chat_id=chat_id, text=slatepack)
-        reply_text = t('slateboy.msg_withdraw_instructions')
-        update.context.bot.send_message(chat_id=chat_id, text=reply_text)
+
+        # check if personality wants something sent to the user
+        if msg is not None and msg != '':
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=msg)
 
 
     def handlerRequestDeposit(self, update, context):
-        chat_id = update.message.chat.id
-
-        # get the amount if provided
-        deposited_amount = None
-        if len(context.args) > 0:
-            try:
-                deposited_amount = float(context.args[0])
-            except ValueError:
-                reply_text = t('slateboy.msg_deposit_invalid_amount').format(
-                    context.args[0])
-                return update.context.bot.send_message(
-                    chat_id=chat_id, text=reply_text)
-
-        # check if user can deposit
-        approved, reason = self.callback_deposit(update, context, offered_amount)
-
-        if not approved:
-            return update.context.bot.send_message(chat_id=chat_id, text=reason)
-
-        # proceed with the deposit
-        if deposited_amount is None:
-            # send instructions to the user for the SRS flow
-            reply_text = t('slateboy.msg_deposit_srs_instructions')
-            return update.context.bot.send_message(chat_id=chat_id, text=reply_text)
-
-        # send instructions to the user for the RSR
-        success, slatepack, txid = self.walletReceipt(deposited_amount)
-        if not success:
-            reply_text = t('slateboy.msg_deposit_rsr_wallet_error')
-            return update.context.bot.send_message(chat_id=chat_id, text=reply_text)
-
-        # lock the amount
-        success, reason = self.callback_deposit_lock(update, context, deposited_amount, txid)
-        if not success:
-            return update.context.bot.send_message(chat_id=chat_id, text=reason)
-
-        update.context.bot.send_message(chat_id=chat_id, text=slatepack)
-        reply_text = t('slateboy.msg_deposit_rsr_instructions')
-        update.context.bot.send_message(chat_id=chat_id, text=reply_text)
+        # TODO
 
 
     def handlerBalance(self, update, context):
-        chat_id = update.message.chat.id
-
-        # get the balance
-        success, reason, balance = self.callback_balance(update, context)
-        if not success:
-            # probably data was not correctly initiated, break!
-            return update.context.bot.send_message(chat_id=chat_id, text=reason)
-
-        spendable, confirming, locked = balance
-
-        reply_text = t('slateboy.msg_balance').format(
-            str(spendable), str(confirming), str(locked))
-        update.context.bot.send_message(chat_id=chat_id, text=reply_text)
+        # TODO
 
 
     def genericTextHandler(self, update, context):
@@ -275,29 +263,8 @@ class SlateBoy:
     def jobTXs(self, context):
         self.callback_job_txs(context, self.walletQueryConfirmed, self.config_job_txs)
 
-
-    def jobAccounting(self, context):
-        self.callback_job_accounting(context, self.config_job_accounting)
-
-
-    # GRIN wallet methods
-    def walletQueryConfirmed(self, txid):
-        # TODO
-        # status is confirmed, confirming or canceled
-        # operation deposit or withdrawal
-        return status, operation, 0
-
-    def walletDecodeSlatepack(self, slatepack):
-        # TODO
+    def jobWalletSynce(self, context):
         pass
 
-    def walletQuerySpendable(self):
-        # TODO
-        pass
 
-    def walletWithdraw(self):
-        # TODO
-        success = True
-        slatepack = ''
-        txid = ''
-        return success, slatepack, txid
+    # GRIN wallet methods TODO

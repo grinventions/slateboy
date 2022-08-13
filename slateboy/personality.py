@@ -117,7 +117,7 @@ class BlankPersonality:
 
     # renaming standard commands
     def renameStandardCommands(self):
-        return []
+        return {}
 
     # registering custom commands
     def registerCustomCommands(self):
