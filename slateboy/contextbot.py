@@ -8,11 +8,15 @@ from slateboy.personality import BlankPersonality
 # which can be made persistent if needed
 class ContextBlankPersonality(BlankPersonality):
     def __init__(self, slateboy, namespace,
-                 EULA_key='', EULA_version=''):
+                 admins=[], EULA_key='', EULA_version=''):
         self.parent.__init__(self, slateboy)
 
         # namespace key for the user and bot session
         self.namespace = namespace
+
+        # admins
+        self.admins = admins
+        self.validateAdmins()
 
         # EULA
         self.EULA_key = EULA
@@ -21,6 +25,11 @@ class ContextBlankPersonality(BlankPersonality):
     #
     # utility methods
     #
+
+    # if you have custom logic for handling admins you may override this method
+    def validateAdmins(self, admins):
+        if len(self.admins) == 0:
+            raise ValueError('There needs to be at least one admin')
 
     # checking if user context data structure is initiated
     def isUserContextInitiated(self, context, user_id):
@@ -496,3 +505,29 @@ class ContextBlankPersonality(BlankPersonality):
         success = True
         reason = None
         return success, reason
+
+    # Group behavior
+
+    # if bot gets added to the group we check if was added by the admin
+    # if not, bot will leave immediately
+    def shouldLeave(self, update, context):
+        # get the user_id
+        user_id = update.message.from_user.id
+
+        # bot will leave the group if added by a stranger
+        if user_id not in self.admins:
+            return True
+
+        # bot was added by one of the admins
+        # all done!
+        return False
+
+    # we want the bot to ignore other bots by default
+    def shouldIgnore(self, update, context):
+        # is the message coming from a bot?
+        if update.message.from_user.is_bot:
+            return True
+
+        # seems like we can let this flow continue...
+        # all done!
+        return False
