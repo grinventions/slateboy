@@ -137,41 +137,69 @@ class ContextBlankPersonality(BlankPersonality):
         balance = context.user_data[self.namespace]['balance']
         return success, reason, balance
 
+    def assignTx(self, context, user_id, tx_id):
+        context.bot_data[self.namespace]['txs'][tx_id] = str(user_id)
+        context.user_data[self.namespace][user_id]['txs'].append(tx_id)
+
+    def unassignTx(self, context, user_id, tx_id):
+        del context.bot_data[self.namespace]['txs'][tx_id]
+        context.user_data[self.namespace][user_id]['txs'].remove(tx_id)
+
+    def isTx(self, context, tx_id):
+        if tx_id in context.bot_data[self.namespace]['txs'].keys():
+            raise ValueError('Invalid Transaction')
+
+        # yes!
+        return True
+
+    def isTxValid(self, context, user_id, tx_id):
+        if tx_id in context.user_data[self.namespace][user_id]['txs']:
+            raise ValueError('Invalid Transaction')
+
+        # yes!
+        return True
+
     #
     # bot interface methods
     #
 
     # getting the balance
     def getBalance(self, update, context):
-        chat_id = update.message.chat.id
+        # get the user_id
         user_id = update.message.from_user.id
 
+        # get the balance
         success, reason, balance = getUserBalance(self, context, user_id)
         if not success:
             return update.context.bot.send_message(chat_id=chat_id, text=reason)
 
-        return balance, reason
+        # all done!
+        return success, reason, balance
 
     # deposit behavior
 
     # by default we just accept all the deposits
     def canDeposit(self, update, context, amount):
-        chat_id = update.message.chat.id
+        # get the user_id
         user_id = update.message.from_user.id
 
+        # make sure user does have a valid context
+        # if not, simply create it
         is_initiated, _ = self.isUserContextInitiated(context, user_id)
         if not is_initiated:
             self.initUserContext(context, user_id)
 
+        # all done!
         success = True
         reason = None
         result = True
         return success, reason, result
 
     def assignDepositTx(self, update, context, amount, tx_id):
-        chat_id = update.message.chat.id
+        # get the user_id
         user_id = update.message.from_user.id
 
+        # check if this transaction has already been assigned
         if tx_id in context.bot_data[self.namespace]['txs'].keys():
             success = False
             reason = t('slateboy.msg_tx_already_assigned')
@@ -182,15 +210,18 @@ class ContextBlankPersonality(BlankPersonality):
         context.bot_data[self.namespace]['txs'][tx_id] = str(user_id)
         context.user_data[self.namespace][user_id]['txs'].append(tx_id)
 
-        # update balances
+        # fetch the balance
         success, reason, balance = getUserBalance(self, context, user_id)
         spendable, awaiting_confirmation, awaiting_finalization, locked = balance
 
+        # requested a deposit, make it awaiting finalization
         awaiting_finalization += amount
 
+        # update the balance
         balance = spendable, awaiting_confirmation, awaiting_finalization, locked
         context.user_data[self.namespace]['balance'] = balance
 
+        # all done!
         success = True
         reason = None
         reply_text = t('slateboy.msg_deposit_assigned').format(
@@ -199,24 +230,25 @@ class ContextBlankPersonality(BlankPersonality):
         return success, reason, reply_text
 
     def finalizeDepositTx(self, update, context, amount, tx_id):
-        chat_id = update.message.chat.id
+        # get the user_id
         user_id = update.message.from_user.id
 
-        if tx_id in context.bot_data[self.namespace]['txs'].keys():
-            raise ValueError('Invalid Transaction')
+        # validate this tx for given user
+        self.isTxValid(context, user_id, tx_id)
 
-        if tx_id in context.user_data[self.namespace][user_id]['txs']:
-            raise ValueError('Invalid Transaction')
-
+        # fetch the balance
         success, reason, balance = getUserBalance(self, context, user_id)
         spendable, awaiting_confirmation, awaiting_finalization, locked = balance
 
+        # the deposit was finalized, move it to awaiting finalization
         awaiting_confirmation += amount
         awaiting_finalization -= amount
 
+        # update the balance
         balance = spendable, awaiting_confirmation, awaiting_finalization, locked
         context.user_data[self.namespace]['balance'] = balance
 
+        # all done!
         success = True
         reason = None
         reply_text = t('slateboy.msg_deposit_finalized').format(
@@ -225,28 +257,31 @@ class ContextBlankPersonality(BlankPersonality):
         return success, reason, reply_text
 
     def confirmDepositTx(self, context, amount, tx_id):
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        # check if this tx exists
+        self.isTx(context, tx_id)
 
-        if tx_id in context.bot_data[self.namespace]['txs'].keys():
-            raise ValueError('Invalid Transaction')
+        # fetch user ID from the index
+        user_id = context.bot_data[self.namespace]['txs'][tx_id]
 
-        if tx_id in context.user_data[self.namespace][user_id]['txs']:
-            raise ValueError('Invalid Transaction')
+        # validate this tx for given user
+        self.isTxValid(context, user_id, tx_id)
 
+        # fetch the balance
         success, reason, balance = getUserBalance(self, context, user_id)
         spendable, awaiting_confirmation, awaiting_finalization, locked = balance
 
+        # the deposit is confirmed, make it spendable
         spendable += amount
         awaiting_confirmation -= amount
 
+        # update the balance
         balance = spendable, awaiting_confirmation, awaiting_finalization, locked
         context.user_data[self.namespace]['balance'] = balance
 
         # remove this transaction ID from the index
-        del context.bot_data[self.namespace]['txs'][tx_id]
-        context.user_data[self.namespace][user_id]['txs'].remove(tx_id)
+        self.unassignTx(context, user_id, tx_id)
 
+        # all done!
         success = True
         reason = None
         reply_text = t('slateboy.msg_deposit_confirmed').format(
@@ -255,27 +290,30 @@ class ContextBlankPersonality(BlankPersonality):
         return success, reason, reply_text
 
     def cancelDepositTx(self, context, amount, tx_id, update=False):
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        # check if this tx exists
+        self.isTx(context, tx_id)
 
-        if tx_id in context.bot_data[self.namespace]['txs'].keys():
-            raise ValueError('Invalid Transaction')
+        # fetch user ID from the index
+        user_id = context.bot_data[self.namespace]['txs'][tx_id]
 
-        if tx_id in context.user_data[self.namespace][user_id]['txs']:
-            raise ValueError('Invalid Transaction')
+        # validate this tx for given user
+        self.isTxValid(context, user_id, tx_id)
 
+        # fetch the balance
         success, reason, balance = getUserBalance(self, context, user_id)
         spendable, awaiting_confirmation, awaiting_finalization, locked = balance
 
+        # the deposit failed, the amount is not longer awaiting finalization
         awaiting_finalization -= amount
 
+        # update balances
         balance = spendable, awaiting_confirmation, awaiting_finalization, locked
         context.user_data[self.namespace]['balance'] = balance
 
         # remove this transaction ID from the index
-        del context.bot_data[self.namespace]['txs'][tx_id]
-        context.user_data[self.namespace][user_id]['txs'].remove(tx_id)
+        self.unassignTx(context, user_id, tx_id)
 
+        # all done!
         success = True
         reason = None
         reply_text = t('slateboy.msg_deposit_canceled').format(
@@ -296,34 +334,35 @@ class ContextBlankPersonality(BlankPersonality):
         spendable, awaiting_confirmation, awaiting_finalization, locked = balance
         result = amount < spendable
 
+        # all done!
         success = True
         reason = None
         return success, reason, result
 
     def assignWithdrawTx(self, update, context, amount, tx_id):
-        chat_id = update.message.chat.id
+        # get the user_id
         user_id = update.message.from_user.id
 
+        # check if this transaction has already been assigned
         if tx_id in context.bot_data[self.namespace]['txs'].keys():
-            success = False
-            reason = t('slateboy.msg_tx_already_assigned')
-            reply_text = None
-            return success, reason, reply_text
+            raise Exception('Transaction already assigned')
 
-        # assign user
-        context.bot_data[self.namespace]['txs'][tx_id] = str(user_id)
-        context.user_data[self.namespace][user_id]['txs'].append(tx_id)
+        # assign this tx to the user
+        self.assignTx(context, user_id, tx_id)
 
-        # update balances
+        # fetch the balance
         success, reason, balance = getUserBalance(self, context, user_id)
         spendable, awaiting_confirmation, awaiting_finalization, locked = balance
 
+        # attempting to withdraw, locking the amount
         spendable -= amount
         locked += amount
 
+        # update balances
         balance = spendable, awaiting_confirmation, awaiting_finalization, locked
         context.user_data[self.namespace]['balance'] = balance
 
+        # all done!
         success = True
         reason = None
         reply_text = t('slateboy.msg_withdraw_assigned').format(
@@ -332,12 +371,13 @@ class ContextBlankPersonality(BlankPersonality):
         return success, reason, reply_text
 
     def finalizeWithdrawTx(self, update, context, amount, tx_id):
-        if tx_id in context.bot_data[self.namespace]['txs'].keys():
-            raise ValueError('Invalid Transaction')
+        # get the user_id
+        user_id = update.message.from_user.id
 
-        if tx_id in context.user_data[self.namespace][user_id]['txs']:
-            raise ValueError('Invalid Transaction')
+        # validate this tx for given user
+        self.isTxValid(context, user_id, tx_id)
 
+        # all done!
         success = True
         reason = None
         reply_text = t('slateboy.msg_withdraw_finalized').format(
@@ -346,27 +386,30 @@ class ContextBlankPersonality(BlankPersonality):
         return success, reason, reply_text
 
     def confirmWithdrawTx(self, context, amount, tx_id):
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        # check if this tx exists
+        self.isTx(context, tx_id)
 
-        if tx_id in context.bot_data[self.namespace]['txs'].keys():
-            raise ValueError('Invalid Transaction')
+        # fetch user ID from the index
+        user_id = context.bot_data[self.namespace]['txs'][tx_id]
 
-        if tx_id in context.user_data[self.namespace][user_id]['txs']:
-            raise ValueError('Invalid Transaction')
+        # validate this tx for given user
+        self.isTxValid(context, user_id, tx_id)
 
+        # fetch the balance
         success, reason, balance = getUserBalance(self, context, user_id)
         spendable, awaiting_confirmation, awaiting_finalization, locked = balance
 
+        # confirmed so no longer locked
         locked -= amount
 
+        # update the balance
         balance = spendable, awaiting_confirmation, awaiting_finalization, locked
         context.user_data[self.namespace]['balance'] = balance
 
         # remove this transaction ID from the index
-        del context.bot_data[self.namespace]['txs'][tx_id]
-        context.user_data[self.namespace][user_id]['txs'].remove(tx_id)
+        self.unassignTx(context, user_id, tx_id)
 
+        # all done!
         success = True
         reason = None
         reply_text = t('slateboy.msg_withdraw_confirmed').format(
@@ -374,29 +417,32 @@ class ContextBlankPersonality(BlankPersonality):
             str(awaiting_finalization), str(locked))
         return success, reason, reply_text
 
-    def cancelWithdrawTx(self, context, amount, tx_id, update=False):
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+    def cancelWithdrawTx(self, context, amount, tx_id):
+        # check if this tx exists
+        self.isTx(context, tx_id)
 
-        if tx_id in context.bot_data[self.namespace]['txs'].keys():
-            raise ValueError('Invalid Transaction')
+        # fetch user ID from the index
+        user_id = context.bot_data[self.namespace]['txs'][tx_id]
 
-        if tx_id in context.user_data[self.namespace][user_id]['txs']:
-            raise ValueError('Invalid Transaction')
+        # validate this tx for given user
+        self.isTxValid(context, user_id, tx_id)
 
+        # fetch the balance
         success, reason, balance = getUserBalance(self, context, user_id)
         spendable, awaiting_confirmation, awaiting_finalization, locked = balance
 
+        # canceled the withdraw, moving from locked back to spendable
         locked -= amount
         spendable += amount
 
+        # update the balance
         balance = spendable, awaiting_confirmation, awaiting_finalization, locked
         context.user_data[self.namespace]['balance'] = balance
 
         # remove this transaction ID from the index
-        del context.bot_data[self.namespace]['txs'][tx_id]
-        context.user_data[self.namespace][user_id]['txs'].remove(tx_id)
+        self.unassignTx(context, user_id, tx_id)
 
+        # all done!
         success = True
         reason = None
         reply_text = t('slateboy.msg_deposit_canceled').format(
