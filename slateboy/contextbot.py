@@ -8,14 +8,14 @@ from slateboy.personality import BlankPersonality
 # which can be made persistent if needed
 class ContextBlankPersonality(BlankPersonality):
     def __init__(self, slateboy, namespace,
-                 EULA='', EULA_version=''):
+                 EULA_key='', EULA_version=''):
         self.parent.__init__(self, slateboy)
 
         # namespace key for the user and bot session
         self.namespace = namespace
 
         # EULA
-        self.EULA = EULA
+        self.EULA_key = EULA
         self.EULA_version = EULA_version
 
     #
@@ -63,6 +63,7 @@ class ContextBlankPersonality(BlankPersonality):
 
         context.user_data[self.namespace][user_id]['balance'] = _default_balance
         context.user_data[self.namespace][user_id]['txs'] = []
+        context.user_data[self.namespace][user_id]['EULA'] = None
 
         # done
         success = True
@@ -449,3 +450,49 @@ class ContextBlankPersonality(BlankPersonality):
             str(spendable), str(awaiting_confirmation),
             str(awaiting_finalization), str(locked))
         return success, reason, reply_text
+
+    # EULA behavior
+
+    # whether user has to see the terms and agreements
+    def shouldSeeEULA(self, update, context):
+        # get the user_id
+        user_id = update.message.from_user.id
+
+        # check most recent EULA signed by the user
+        signed_version = context.user_data[self.namespace][user_id]['EULA']
+
+        if signed_version is None:
+            needs_to_see = True
+            EULA = t(self.EULA_key)
+            return needs_to_see, EULA
+
+        if signed_version != self.EULA_version:
+            needs_to_see = True
+            EULA = t(self.EULA_key)
+            return needs_to_see, EULA
+
+        # looks like user has approved our terms
+        # all done!
+        needs_to_see = False
+        EULA = None
+        return needs_to_see, EULA
+
+    # we mark user has approved terms and agreement
+    def approvedEULA(self, update, context):
+        # get the user_id
+        user_id = update.message.from_user.id
+
+        # mark the approved EULA as the currently required one
+        context.user_data[self.namespace][user_id]['EULA'] = self.EULA_version
+
+        # all done!
+        success = True
+        reason = None
+        return success, reason
+
+    # we do not record EULA denials, simply ignore
+    def deniedEULA(self, update, context):
+        # all done!
+        success = True
+        reason = None
+        return success, reason
