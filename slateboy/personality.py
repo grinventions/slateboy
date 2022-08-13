@@ -19,23 +19,60 @@ class BlankPersonality:
         pass
 
     # deposit behavior
-    def canDeposit(self, update, context):
+
+    # (bool, str)
+    # bool indicates whether user can deposit the amount
+    # str is the formatted message to the user
+    def canDeposit(self, update, context, amount):
         pass
 
-    def finalizeDeposit(self, update, context):
+    # puts amount as awaiting_finalization balance
+    # returns (str)
+    # str is the formatted message to the user
+    # it can contain {slatepack} tag to put the slatepack
+    # inside of it, if the tag is not included, the slatepack
+    # will be sent in the separate message
+    def assignDepositTx(self, update, context, amount tx_id):
         pass
 
-    def cancelDeposit(self, context, update=False):
+    # puts amount as awaiting_confirmation balance
+    # returns (str)
+    # str is the formatted message to the user
+    def finalizeDepositTx(self, update, context, amount, tx_id):
+        pass
+
+    # is called if user does not "pay" on time
+    # removes amount from awaiting_finalization balance
+    def cancelDeposit(self, context, amount, tx_id, update=False):
         pass
 
     # withdraw behavior
-    def canWithdraw(self, update, context):
+
+    # (bool, str)
+    # bool indicates whether user can withdraw the amount
+    # str is the formatted message to the user
+    def canWithdraw(self, update, context, amount):
         pass
 
-    def finalizeWithdraw(self, update, context):
+    # moves amount from spendable balance to locked balance
+    # returns (str)
+    # str is the formatted message to the user
+    # it can contain {slatepack} tag to put the slatepack
+    # inside of it, if the tag is not included, the slatepack
+    # will be sent in the separate message
+    def assignWithdrawTx(self, update, context, tx_id):
         pass
 
-    def cancelWithdraw(self, context, update=None):
+    # does not move any balance but it is a chance to format message
+    # to the user
+    # returns (str)
+    # str is the formatted message to the user
+    def finalizeWithdraw(self, update, context, amount, tx_id):
+        pass
+
+    # is called if user does not "receive" on time
+    # moves amount from locked back to spendable
+    def cancelWithdraw(self, context, amount, tx_id, update=None):
         pass
 
     # EULA behavior
