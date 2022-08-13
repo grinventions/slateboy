@@ -3,6 +3,18 @@ class BlankPersonality:
         self.slateboy = slateboy
 
     # getting the balance
+    # returns one of the following types
+    #
+    # (int, int, int)
+    # (spendable, confirming, locked)
+    # then it is assumed to be GRIN in IGNO unit
+    #
+    # (float, float, float)
+    # (spendable, confirming, locked)
+    # then it is assumed to be GRIN in whole GRIN units
+    #
+    # str
+    # formatted balance text ready for the user
     def getBalance(self, update, context):
         pass
 

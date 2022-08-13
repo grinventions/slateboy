@@ -19,7 +19,7 @@ class ContextBlankPersonality(BlankPersonality):
         self.EULA_version = EULA_version
 
     #
-    # utility functions
+    # utility methods
     #
 
     # checking if user context data structure is initiated
@@ -138,3 +138,20 @@ class ContextBlankPersonality(BlankPersonality):
         balance = context.user_data[self.namespace]['balance']
         return success, reason, balance
 
+    #
+    # bot interface methods
+    #
+
+    # getting the balance
+    def getBalance(self, update, context):
+        chat_id = update.message.chat.id
+        user_id = update.message.from_user.id
+
+        success, reason, balance = getUserBalance(self, context, user_id)
+        if not success:
+            return update.context.bot.send_message(chat_id=chat_id, text=reason)
+
+        spendable, confirming, locked = balance
+        reply_text = t('slateboy.msg_balance').format(
+            str(spendable), str(confirming), str(locked))
+        return update.context.bot.send_message(chat_id=chat_id, text=reply_text)
