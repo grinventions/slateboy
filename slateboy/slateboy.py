@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 import re
 
 from telegram.ext import Updater, CommandHandler, MessageHandler
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
 from i18n.translator import t
 
 # default context checkers and initiators
@@ -101,7 +103,7 @@ class SlateBoy:
         # get the user_id
         chat_id = update.message.chat.id
 
-        # check if wallet is operations
+        # check if wallet is operational
         is_wallet_ready, reason = self.isWalletReady()
         if not is_wallet_ready:
             return update.context.bot.send_message(
@@ -157,8 +159,8 @@ class SlateBoy:
                 chat_id=chat_id, text=reply_text)
 
         # if reached here, it means it is approved
-        # perform the invoice flow
-        success, reason, slatepack, tx_id = self.walletInvoice(approved_amount)
+        # begin the SRS flow
+        success, reason, slatepack, tx_id = self.walletSend(approved_amount)
 
         # check if for some reason it has failed,
         # example reason could be all the outputs are locked at the moment
@@ -202,7 +204,105 @@ class SlateBoy:
 
 
     def handlerRequestDeposit(self, update, context):
-        # TODO
+        # get the user_id
+        chat_id = update.message.chat.id
+
+        # check if wallet is operational
+        is_wallet_ready, reason = self.isWalletReady()
+        if not is_wallet_ready:
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
+
+        # check if the personality wishes this user to see the EULA
+        needs_to_see, EULA = self.personality.shouldSeeEULA(self, update, context)
+        if needs_to_see:
+            reply_text = t('slateboy.msg_eula_info')
+            update.context.bot.send_message(chat_id=chat_id, text=reply_text)
+            keyboard = [
+                [InlineKeyboardButton(t('slateboy.eula_approve'), callback_data='eula-approve')],
+                [InlineKeyboardButton(t('slateboy.eula_deny'), callback_data='eula-deny')]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=EULA, reply_markup=reply_markup)
+
+        # check if there is amount specified
+        if len(context.args) == 0:
+            # inform the user that has to specify the amount to use /deposit
+            # command, it is possible to deposit without specifying the amount
+            # by simply sending an SRS slatepack
+            reply_text = t('slateboy.msg_deposit_missing_amount')
+            return update.context.bot.send_message(chat_id=chat_id, text=reply_text)
+
+        # validate the request amount
+        requested_amount = None
+        try:
+            requested_amount = float(context.args[0])
+        except ValueError:
+            # inform the user the amount is invalid, but it is possible
+            # to just send a slatepack
+            reply_text = t('slateboy.msg_deposit_invalid_amount').format(
+                    context.args[0])
+            return update.context.bot.send_message(
+                    chat_id=chat_id, text=reply_text)
+
+        # consult the personality if this deposit is approved
+        success, reason, result, approved_amount = self.personality.canDeposit(
+            update, context, requested_amount)
+
+        # there might have been custom logic reason why the personality
+        # has decided to reject this request
+        if not result and reason is not None:
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
+
+        # rejected for unknown reasons
+        if not result:
+            reply_text = t('slateboy.msg_deposit_rejected_unknown')
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reply_text)
+
+        # if reached here, it means it is approved
+        # begin the RSR flow
+        success, reason, slatepack, tx_id = self.walletInvoice(approved_amount)
+
+        # check if for some reason it has failed
+        if not success:
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
+
+        # let the personality assign this tx_id
+        success, reason, send_instructions, msg = self.personality.assignDepositTx(
+            update, context, approved_amount, tx_id)
+
+        # did it not work for some reason?
+        if not success:
+            # release the locked outputs
+            self.walletReleaseLock(tx_id)
+
+            # inform the user of the failure
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
+
+        # check if personality wants deposit instruction send
+        if send_instructions:
+            reply_text = t('slateboy.msg_deposit_instructions')
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reply_text)
+
+        # send slatepack and or message from the personality
+        if '{slatepack}' in msg:
+            replyt_text = msg.format(slatepack)
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
+
+        # personality did not specify how to format the slatepack
+        # sending it separately
+        update.context.bot.send_message(chat_id=chat_id, text=slatepack)
+
+        # check if personality wants something sent to the user
+        if msg is not None and msg != '':
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=msg)
 
 
     def handlerBalance(self, update, context):

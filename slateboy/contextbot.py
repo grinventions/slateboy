@@ -394,10 +394,11 @@ class ContextBlankPersonality(BlankPersonality):
         # all done!
         success = True
         reason = None
+        send_instructions = True
         reply_text = t('slateboy.msg_withdraw_assigned').format(
             str(spendable), str(awaiting_confirmation),
             str(awaiting_finalization), str(locked))
-        return success, reason, reply_text
+        return success, reason, send_instructions, reply_text
 
     def finalizeWithdrawTx(self, update, context, amount, tx_id):
         # get the user_id
