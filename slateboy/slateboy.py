@@ -206,6 +206,7 @@ class SlateBoy:
     def handlerRequestDeposit(self, update, context):
         # get the user_id
         chat_id = update.message.chat.id
+        user_id = update.message.from_user.id
 
         # check if wallet is operational
         is_wallet_ready, reason = self.isWalletReady()
@@ -214,22 +215,10 @@ class SlateBoy:
                 chat_id=chat_id, text=reason)
 
         # check if the personality wishes this user to see the EULA
-        needs_to_see, EULA, EULA_verion = self.personality.shouldSeeEULA(self, update, context)
+        needs_to_see, EULA, EULA_verion = self.personality.shouldSeeEULA(
+            update, context)
         if needs_to_see:
-            button_msg_approve = t('slateboy.eula_approve')
-            button_msg_deny = t('slateboy.eula_deny')
-            callback_data_approve = 'eula-approve-' + EULA_verion
-            callback_data_deny = 'eula-deny-' + EULA_verion
-            reply_text = t('slateboy.msg_eula_info')
-            update.context.bot.send_message(chat_id=chat_id, text=reply_text)
-            keyboard = [
-                [InlineKeyboardButton(
-                    button_msg_approve, callback_data=callback_data_approve)],
-                [InlineKeyboardButton(
-                    button_msg_deny, callback_data=callback_data_deny)]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            return update.context.bot.send_message(
-                chat_id=chat_id, text=EULA, reply_markup=reply_markup)
+            return self.displayEULA(context, EULA, EULA_verion, user_id)
 
         # check if there is amount specified
         if len(context.args) == 0:
@@ -352,61 +341,171 @@ class SlateBoy:
 
 
     def genericTextHandler(self, update, context):
+        # get the user_id and the message_id
         chat_id = update.message.chat.id
+        user_id = update.message.from_user.id
         message_id = update.message.message_id
 
-        # distinguish DMs from group messages
-        if update.message.chat.type == 'private':
-            # check if it is a slatepack
-            regex = 'BEGINSLATEPACK[\\s\\S]*\\sENDSLATEPACK'
-            matches = re.search(regex, update.message.text, flags=re.DOTALL)
-            if matches is not None:
-                slatepack = matches.group(0)
+        # check if personality wishes to reject this flow
+        ignore, reason = self.personality.shouldIgnore(update, context)
+        if ignore:
+            if reason is not None:
+                return update.context.bot.send_message(
+                    chat_id=chat_id, text=reason)
+            # unknown reason but still ordered to ignore
+            reply_text = t('slateboy.msg_ignored_unknown')
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
 
-                # check the meaning of the slatepack
-                slate = self.walletDecodeSlatepack(slatepack)
-                txid = slate.get('id', -1)
-                if not self.callback_is_txid_known(update, context, txid):
-                    reply_text = t('slateboy.msg_unknown_slatepack')
-                    return update.context.bot.send_message(
+        # does it contain a slatepack?
+        contains_slatepack, slatepack = self.containsSlatepack(update.message.text)
+
+        # let the personality process the message
+        should_continue = self.personality.incomingText(
+            update, context, contains_slatepack)
+        if not should_continue:
+            return None
+
+        # is it a group message?
+        is_group_message = update.message.chat.type != 'private'
+        if is_group_message:
+            should_continue = self.personality.incomingTextGroup(
+                update, context, contains_slatepack)
+            if not should_continue:
+                return None
+
+        # is it a DM?
+        is_direct_message = update.message.chat.type == 'private'
+        if is_direct_message:
+            should_continue = self.personality.incomingTextDM(
+                update, context, contains_slatepack)
+            if not should_continue:
+                return None
+
+        # for direct messages with a slatepack we proceed with the flow
+        if not (is_direct_message and contains_slatepack):
+            return None
+
+        # looks like it is direct message with a slatepack
+        slate = self.walletDecodeSlatepack(slatepack)
+        tx_id = slate.get('id', -1)
+        sta = slate.get('sta', -1)
+
+        # S1 - attempts of deposit
+        if sta == 'S1':
+            # the following processing function will execute
+            # the logic along with the personality to ensure
+            # such a deposit is approved
+            return self.processS1Slatepack(update, context, slatepack)
+
+        # S2 - withdrawal flow, user responded with a slatepack
+        if sta == 'S2':
+            # the following processing function will execute
+            # the logic along with the personality to ensure
+            # such a withdrawal may continue
+            return self.processS2Slatepack(update, context, slatepack)
+
+        # I1 - user sent us an invoice
+        if sta == 'I1':
+            # at this stage we have no logic for such a scenario,
+            # inform the user we ignore it
+            reply_text = t('slateboy.msg_ignoring_invoices')
+            return update.context.bot.send_message(
                         chat_id=chat_id, text=reply_text,
                         reply_to_message_id=message_id)
 
-                sta = slate.get('sta', -1)
-                # slatepack is known, is this srs flow?
-                if sta == 'S1':
-                    # this is a deposit attempt
-                    # TODO run receive
-                    # TODO return instructions and response slatepack
-                    return None
+        # I2 - user responded to our invoice
+        if sta == 'I2':
+            # complete the deposit using the invoice flow
+            return self.processI2Slatepack(update, context, slatepack)
 
-                if sta == 'S2':
-                    # this is response to withdrawal
-                    # TODO run finalize
-                    # TODO return instructions
-                    return None
 
-                if sta == 'I1':
-                    # user sent us an invoice, we ignore
-                    # TODO inform user we do not pay invoices
-                    return None
-
-                if sta == 'I2':
-                    # user has responded to our invoice
-                    # this is deposit
-                    # TODO run finalize
-                    # TODO return instructions
-                    return None
-
-                # TODO inform user of reception of an invalid status code
-                return None
+    def displayEULA(self, context, EULA, EULA_verion, user_id):
+        button_msg_approve = t('slateboy.eula_approve')
+        button_msg_deny = t('slateboy.eula_deny')
+        callback_data_approve = 'eula-approve-' + EULA_verion
+        callback_data_deny = 'eula-deny-' + EULA_verion
+        reply_text = t('slateboy.msg_eula_info')
+        update.context.bot.send_message(chat_id=user_id, text=reply_text)
+        keyboard = [
+            [InlineKeyboardButton(
+                button_msg_approve, callback_data=callback_data_approve)],
+            [InlineKeyboardButton(
+                button_msg_deny, callback_data=callback_data_deny)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        return context.bot.send_message(
+            chat_id=user_id, text=EULA, reply_markup=reply_markup)
 
 
     def jobTXs(self, context):
         self.callback_job_txs(context, self.walletQueryConfirmed, self.config_job_txs)
 
-    def jobWalletSynce(self, context):
+    def jobWalletSync(self, context, user_id, EULA, EULA_verion):
         pass
 
 
     # GRIN wallet methods TODO
+
+    # wrappers
+
+    def processS1Slatepack(self, update, context, slatepack):
+        # get the user_id and the message_id
+        chat_id = update.message.chat.id
+        user_id = update.message.from_user.id
+
+        # check if the personality wishes this user to see the EULA
+        needs_to_see, EULA, EULA_verion = self.personality.shouldSeeEULA(
+            update, context)
+        if needs_to_see:
+            return self.displayEULA(context, EULA, EULA_verion, user_id)
+
+        # get the amount from the slatepacj
+        requested_amount = slate.get('amt', -1)
+        if requested_amount == -1:
+            reply_text = t('slateboy.msg_invalid_slatepack')
+            return update.context.bot.send_message(
+                chat_id=user_id, text=reply_text)
+
+        # consult the personality if this deposit is approved
+        success, reason, result, approved_amount = self.personality.canDeposit(
+            update, context, requested_amount)
+
+        # there might have been custom logic reason why the personality
+        # has decided to reject this request
+        if not result and reason is not None:
+            return update.context.bot.send_message(chat_id=chat_id, text=reason)
+
+        # rejected for unknown reasons
+        if not result:
+            reply_text = t('slateboy.msg_deposit_rejected_unknown')
+            return update.context.bot.send_message(chat_id=chat_id, text=reply_text)
+
+        # looks like all is approved, let us run the receive
+        # let the personality assign this tx_id
+        success, reason, send_instructions, msg = self.personality.assignDepositTx(
+                update, context, approved_amount, tx_id)
+        # TODO error handling
+
+        success, reason, slatepack, tx_id = self.walletInvoice(approved_amount)
+        # TODO error handling
+
+        # done with the S1 flow
+        return None
+
+    def processS2Slatepack(self, update, context, slatepack):
+        pass
+
+    def processI2Slatepack(update, context, slatepack):
+        pass
+
+    # some helpers
+
+    def containsSlatepack(self, text):
+        regex = 'BEGINSLATEPACK[\\s\\S]*\\sENDSLATEPACK'
+        matches = re.search(regex, text, flags=re.DOTALL)
+        contains_slatepack = False
+        slatepack = None
+        if matches is not None:
+            contains_slatepack = True
+            slatepack = matches.group(0)
+        return contains_slatepack, slatepack

@@ -112,8 +112,19 @@ class BlankPersonality:
         pass
 
     # callback about incoming text
-    def incomingText(self, update, context):
-        pass
+    # they respond with a boolean whether if SlateBoy
+    # should continue processing the message
+    # if they return False message will be ignored
+    # even if contains slatepack preventing users
+    # to do deposits and withdrawals!
+    def incomingText(self, update, context, contains_slatepack: bool):
+        return True
+
+    def incomingTextDM(self, update, context, contains_slatepack: bool):
+        return True
+
+    def incomingTextGroup(self, update, context, contains_slatepack: bool):
+        return True
 
     # renaming standard commands
     def renameStandardCommands(self):
