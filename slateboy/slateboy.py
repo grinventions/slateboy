@@ -306,7 +306,43 @@ class SlateBoy:
 
 
     def handlerBalance(self, update, context):
-        # TODO
+        # get the user_id
+        chat_id = update.message.chat.id
+
+        # check if personality wishes to reject this flow
+        ignore, reason = self.personality.shouldIgnore(update, context)
+        if ignore:
+            if reason is not None:
+                return update.context.bot.send_message(
+                    chat_id=chat_id, text=reason)
+            # unknown reason but still ordered to ignore
+            reply_text = t('slateboy.msg_ignored_unknown')
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
+
+        # consult the personality to get the balance
+        success, reason, balance = self.personality.getBalance(
+            update, context)
+
+        # is something wrong?
+        if not success:
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
+
+        # personality can provide already formatted message ready
+        # for the user
+        if isinstance(balance, str):
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=balance)
+
+        # personality can also provide just separate balances
+        # as a tuple and let the slateboy format it
+        spendable, awaiting_confirmation, awaiting_finalization, locked = balance
+        reply_text = t('slateboy.msg_balance').format(
+            str(spendable), str(awaiting_confirmation),
+            str(awaiting_finalization), str(locked))
+        return update.context.bot.send_message(
+                chat_id=chat_id, text=reply_text)
 
 
     def genericTextHandler(self, update, context):
