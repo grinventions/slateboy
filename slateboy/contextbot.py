@@ -493,18 +493,21 @@ class ContextBlankPersonality(BlankPersonality):
         if signed_version is None:
             needs_to_see = True
             EULA = t(self.EULA_key)
-            return needs_to_see, EULA
+            EULA_verion = self.EULA_version
+            return needs_to_see, EULA, EULA_verion
 
         if signed_version != self.EULA_version:
             needs_to_see = True
             EULA = t(self.EULA_key)
-            return needs_to_see, EULA
+            EULA_verion = self.EULA_version
+            return needs_to_see, EULA, EULA_verion
 
         # looks like user has approved our terms
         # all done!
         needs_to_see = False
         EULA = None
-        return needs_to_see, EULA
+        EULA_verion = self.EULA_version
+        return needs_to_see, EULA, EULA_verion
 
     # we mark user has approved terms and agreement
     def approvedEULA(self, update, context):

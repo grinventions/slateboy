@@ -214,13 +214,19 @@ class SlateBoy:
                 chat_id=chat_id, text=reason)
 
         # check if the personality wishes this user to see the EULA
-        needs_to_see, EULA = self.personality.shouldSeeEULA(self, update, context)
+        needs_to_see, EULA, EULA_verion = self.personality.shouldSeeEULA(self, update, context)
         if needs_to_see:
+            button_msg_approve = t('slateboy.eula_approve')
+            button_msg_deny = t('slateboy.eula_deny')
+            callback_data_approve = 'eula-approve-' + EULA_verion
+            callback_data_deny = 'eula-deny-' + EULA_verion
             reply_text = t('slateboy.msg_eula_info')
             update.context.bot.send_message(chat_id=chat_id, text=reply_text)
             keyboard = [
-                [InlineKeyboardButton(t('slateboy.eula_approve'), callback_data='eula-approve')],
-                [InlineKeyboardButton(t('slateboy.eula_deny'), callback_data='eula-deny')]]
+                [InlineKeyboardButton(
+                    button_msg_approve, callback_data=callback_data_approve)],
+                [InlineKeyboardButton(
+                    button_msg_deny, callback_data=callback_data_deny)]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             return update.context.bot.send_message(
                 chat_id=chat_id, text=EULA, reply_markup=reply_markup)
