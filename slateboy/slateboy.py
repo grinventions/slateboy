@@ -271,24 +271,13 @@ class SlateBoy:
         success, reason, result, approved_amount = self.personality.canWithdraw(
             update, context, requested_amount, maximum=is_maximum_request)
 
-        # check if user has requested too much?
-        if not result and reason is None and approved_amount is not None:
-            reply_text = t('slateboy.msg_withdraw_balance_exceeded').format(
-                str(requested_amount), str(approved_amount))
-            return update.context.bot.send_message(
-                chat_id=chat_id, text=reply_text)
-
-        # there might have been custom logic reason why the personality
-        # has decided to reject this request
-        if not result and reason is not None:
-            return update.context.bot.send_message(
-                chat_id=chat_id, text=reason)
-
-        # rejected for unknown reasons
-        if not result:
-            reply_text = t('slateboy.msg_withdraw_rejected_unknown')
-            return update.context.bot.send_message(
-                chat_id=chat_id, text=reply_text)
+        # process the personality's response
+        shall_continue = self.validateFinancialOperation(
+            success, reason, result,
+            'slateboy.msg_withdraw_rejected_known',
+            'slateboy.msg_withdraw_rejected_unknown')
+        if not shall_continue:
+            return shall_continue
 
         # if reached here, it means it is approved
         # begin the SRS flow
@@ -297,8 +286,10 @@ class SlateBoy:
         # check if for some reason it has failed,
         # example reason could be all the outputs are locked at the moment
         if not success:
-            return update.context.bot.send_message(
+            update.context.bot.send_message(
                 chat_id=chat_id, text=reason)
+            shall_continue = False
+            return shall_continue
 
         # let the personality assign this tx_id
         success, reason, send_instructions, msg = self.personality.assignWithdrawTx(
@@ -310,20 +301,26 @@ class SlateBoy:
             self.walletReleaseLock(tx_id)
 
             # inform the user of the failure
-            return update.context.bot.send_message(
+            update.context.bot.send_message(
                 chat_id=chat_id, text=reason)
+            shall_continue = False
+            return shall_continue
 
         # check if personality wants withdrawal instruction send
         if send_instructions:
             reply_text = t('slateboy.msg_withdraw_instructions')
-            return update.context.bot.send_message(
+            update.context.bot.send_message(
                 chat_id=chat_id, text=reply_text)
+            shall_continue = False
+            return shall_continue
 
         # send slatepack and or message from the personality
         if '{slatepack}' in msg:
             replyt_text = msg.format(slatepack)
-            return update.context.bot.send_message(
+            update.context.bot.send_message(
                 chat_id=chat_id, text=reason)
+            shall_continue = False
+            return shall_continue
 
         # personality did not specify how to format the slatepack
         # sending it separately
@@ -331,8 +328,10 @@ class SlateBoy:
 
         # check if personality wants something sent to the user
         if msg is not None and msg != '':
-            return update.context.bot.send_message(
+            update.context.bot.send_message(
                 chat_id=chat_id, text=msg)
+            shall_continue = False
+            return shall_continue
 
 
     @checkWallet
@@ -350,17 +349,13 @@ class SlateBoy:
         success, reason, result, approved_amount = self.personality.canDeposit(
             update, context, requested_amount)
 
-        # there might have been custom logic reason why the personality
-        # has decided to reject this request
-        if not result and reason is not None:
-            return update.context.bot.send_message(
+        # check if for some reason it has failed,
+        # example reason could be all the outputs are locked at the moment
+        if not success:
+            update.context.bot.send_message(
                 chat_id=chat_id, text=reason)
-
-        # rejected for unknown reasons
-        if not result:
-            reply_text = t('slateboy.msg_deposit_rejected_unknown')
-            return update.context.bot.send_message(
-                chat_id=chat_id, text=reply_text)
+            shall_continue = False
+            return shall_continue
 
         # if reached here, it means it is approved
         # begin the RSR flow
@@ -368,8 +363,10 @@ class SlateBoy:
 
         # check if for some reason it has failed
         if not success:
-            return update.context.bot.send_message(
+            update.context.bot.send_message(
                 chat_id=chat_id, text=reason)
+            shall_continue = False
+            return shall_continue
 
         # let the personality assign this tx_id
         success, reason, send_instructions, msg = self.personality.assignDepositTx(
@@ -381,20 +378,26 @@ class SlateBoy:
             self.walletReleaseLock(tx_id)
 
             # inform the user of the failure
-            return update.context.bot.send_message(
+            update.context.bot.send_message(
                 chat_id=chat_id, text=reason)
+            shall_continue = False
+            return shall_continue
 
         # check if personality wants deposit instruction send
         if send_instructions:
             reply_text = t('slateboy.msg_deposit_instructions')
-            return update.context.bot.send_message(
+            update.context.bot.send_message(
                 chat_id=chat_id, text=reply_text)
+            shall_continue = False
+            return shall_continue
 
         # send slatepack and or message from the personality
         if '{slatepack}' in msg:
             replyt_text = msg.format(slatepack)
-            return update.context.bot.send_message(
+            update.context.bot.send_message(
                 chat_id=chat_id, text=reason)
+            shall_continue = False
+            return shall_continue
 
         # personality did not specify how to format the slatepack
         # sending it separately
@@ -402,8 +405,10 @@ class SlateBoy:
 
         # check if personality wants something sent to the user
         if msg is not None and msg != '':
-            return update.context.bot.send_message(
+            update.context.bot.send_message(
                 chat_id=chat_id, text=msg)
+            shall_continue = False
+            return shall_continue
 
 
     @checkShouldIgnore('slateboy.msg_balance_ignored_unknown')
@@ -417,14 +422,18 @@ class SlateBoy:
 
         # is something wrong?
         if not success:
-            return update.context.bot.send_message(
+            update.context.bot.send_message(
                 chat_id=chat_id, text=reason)
+            shall_continue = False
+            return shall_continue
 
         # personality can provide already formatted message ready
         # for the user
         if isinstance(balance, str):
-            return update.context.bot.send_message(
+            update.context.bot.send_message(
                 chat_id=chat_id, text=balance)
+            shall_continue = False
+            return shall_continue
 
         # personality can also provide just separate balances
         # as a tuple and let the slateboy format it
@@ -432,8 +441,10 @@ class SlateBoy:
         reply_text = t('slateboy.msg_balance').format(
             str(spendable), str(awaiting_confirmation),
             str(awaiting_finalization), str(locked))
-        return update.context.bot.send_message(
-                chat_id=chat_id, text=reply_text)
+        update.context.bot.send_message(
+            chat_id=chat_id, text=reply_text)
+        shall_continue = False
+        return shall_continue
 
 
     @checkShouldIgnore('slateboy.msg_generic_ignored_unknown')
@@ -447,26 +458,26 @@ class SlateBoy:
         contains_slatepack, slatepack = self.containsSlatepack(update.message.text)
 
         # let the personality process the message
-        should_continue = self.personality.incomingText(
+        shall_continue = self.personality.incomingText(
             update, context, contains_slatepack)
-        if not should_continue:
-            return None
+        if not shall_continue:
+            return shall_continue
 
         # is it a group message?
         is_group_message = update.message.chat.type != 'private'
         if is_group_message:
-            should_continue = self.personality.incomingTextGroup(
+            shall_continue = self.personality.incomingTextGroup(
                 update, context, contains_slatepack)
-            if not should_continue:
-                return None
+            if not shall_continue:
+                return shall_continue
 
         # is it a DM?
         is_direct_message = update.message.chat.type == 'private'
         if is_direct_message:
-            should_continue = self.personality.incomingTextDM(
+            shall_continue = self.personality.incomingTextDM(
                 update, context, contains_slatepack)
-            if not should_continue:
-                return None
+            if not shall_continue:
+                return shall_continue
 
         # for direct messages with a slatepack we proceed with the flow
         if not (is_direct_message and contains_slatepack):
@@ -577,3 +588,34 @@ class SlateBoy:
             contains_slatepack = True
             slatepack = matches.group(0)
         return contains_slatepack, slatepack
+
+    def validateFinancialOperation(
+            self, processing_success, reason_of_failure, allowed,
+            reject_reason_known, reject_reason_unknown):
+        # check if user has violated ny terms
+        if not result and reason is None and approved_amount is not None:
+            reply_text = t(reject_reason_known).format(
+                str(requested_amount), str(approved_amount))
+            update.context.bot.send_message(
+                chat_id=chat_id, text=reply_text)
+            shall_continue = False
+            return shall_continue
+
+        # there might have been custom logic reason why the personality
+        # has decided to reject this request
+        if not result and reason is not None:
+            update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
+            shall_continue = False
+            return shall_continue
+
+        # rejected for unknown reasons
+        if not result:
+            reply_text = t(reject_reason_unknown)
+            update.context.bot.send_message(
+                chat_id=chat_id, text=reply_text)
+            shall_continue = False
+            return shall_continue
+
+        shall_continue = True
+        return shall_continue
