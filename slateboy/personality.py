@@ -37,6 +37,10 @@ class BlankPersonality:
     def assignDepositTx(self, update, context, amount, tx_id):
         raise Exception('Unimplemented')
 
+    # return bool and reason
+    def shouldFinalizeDepositTx(self, update, context, tx_id):
+        raise Exception('Unimplemented')
+
     # puts amount as awaiting_confirmation balance
     # returns (str)
     # str is the formatted message to the user
@@ -69,6 +73,10 @@ class BlankPersonality:
     # inside of it, if the tag is not included, the slatepack
     # will be sent in the separate message
     def assignWithdrawTx(self, update, context, tx_id):
+        raise Exception('Unimplemented')
+
+    # return bool and reason
+    def shouldFinalizeWithdrawTx(self, update, context, tx_id):
         raise Exception('Unimplemented')
 
     # does not move any balance but it is a chance to format message

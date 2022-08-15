@@ -459,14 +459,14 @@ class SlateBoy:
             # the following processing function will execute
             # the logic along with the personality to ensure
             # such a deposit is approved
-            return self.processS1Slatepack(update, context, slatepack)
+            return self.processS1Slatepack(update, context, slatepack, tx_id)
 
         # S2 - withdrawal flow, user responded with a slatepack
         if sta == 'S2':
             # the following processing function will execute
             # the logic along with the personality to ensure
             # such a withdrawal may continue
-            return self.processS2Slatepack(update, context, slatepack)
+            return self.processS2Slatepack(update, context, slatepack, tx_id)
 
         # I1 - user sent us an invoice
         if sta == 'I1':
@@ -480,7 +480,7 @@ class SlateBoy:
         # I2 - user responded to our invoice
         if sta == 'I2':
             # complete the deposit using the invoice flow
-            return self.processI2Slatepack(update, context, slatepack)
+            return self.processI2Slatepack(update, context, slatepack, tx_id)
 
 
     def jobTXs(self, context):
@@ -497,7 +497,7 @@ class SlateBoy:
 
     @checkWallet
     @checkEULA
-    def processS1Slatepack(self, update, context, slatepack):
+    def processS1Slatepack(self, update, context, slatepack, tx_id):
         # get the user_id and the message_id
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
@@ -559,12 +559,23 @@ class SlateBoy:
         return shall_continue
 
     @checkWallet
-    def processS2Slatepack(self, update, context, slatepack):
-        pass
+    def processS2Slatepack(self, update, context, slatepack, tx_id):
+        return self.processSlatepack(
+            update, context, slatepack, tx_id,
+            self.personality.shouldFinalizeWithdrawTx,
+            self.personality.finalizeWithdrawTx,
+            'slateboy.msg_i2_withdraw_rejected_unknown',
+            'slateboy.msg_withdraw_finalized')
+
 
     @checkWallet
-    def processI2Slatepack(update, context, slatepack):
-        pass
+    def processI2Slatepack(update, context, slatepack, tx_id):
+        return self.processSlatepack(
+            update, context, slatepack, tx_id,
+            self.personality.shouldFinalizeDepositTx,
+            self.personality.finalizeDepositTx,
+            'slateboy.msg_s2_deposit_rejected_unknown',
+            'slateboy.msg_deposit_finalized')
 
     # some helpers
 
@@ -647,5 +658,62 @@ class SlateBoy:
             update.context.bot.send_message(
                 chat_id=user_id, text=final_message)
 
+        shall_continue = False
+        return shall_continue
+
+    def processSlatepack(
+            self, update, context, slatepack, tx_id,
+            shouldFinalizeQueryMethod,
+            finalizedTxMethod,
+            msg_slatepack_rejected,
+            msg_slatepack_finalized):
+        # get the user_id and the message_id
+        chat_id = update.message.chat.id
+        user_id = update.message.from_user.id
+
+        # check if personality wishes to finalize it
+        should_finalize, reason = shouldFinalizeQueryMethod(update, context, tx_id)
+        if not should_finalize:
+            if reason is not None:
+                update.context.bot.send_message(
+                    chat_id=user_id, text=reason)
+                shall_continue = False
+                return shall_continue
+            reply_text = t(msg_slatepack_rejected)
+            update.context.bot.send_message(
+                chat_id=user_id, text=reply_text)
+            shall_continue = False
+            return shall_continue
+
+        # finalization approved
+        success, reason, finalized_slatepack = self.walletFinalize(slatepack)
+
+        # did it not work for some reason?
+        if not success:
+            # inform the user of the failure
+            update.context.bot.send_message(
+                chat_id=user_id, text=reason)
+            shall_continue = False
+            return shall_continue
+
+        # inform personality of successful finalization
+        success, reason, msg = finalizedTxMethod(update, context, tx_id)
+
+        # did it not work for some reason?
+        if not success:
+            # inform the user of the failure
+            update.context.bot.send_message(
+                chat_id=user_id, text=reason)
+            shall_continue = False
+            return shall_continue
+
+        if msg is not None:
+            update.context.bot.send_message(
+                chat_id=user_id, text=msg)
+            shall_continue = False
+            return shall_continue
+        reply_text = t(msg_slatepack_finalized)
+        update.context.bot.send_message(
+                chat_id=user_id, text=reply_text)
         shall_continue = False
         return shall_continue

@@ -480,6 +480,25 @@ class ContextBlankPersonality(BlankPersonality):
             str(awaiting_finalization), str(locked))
         return success, reason, reply_text
 
+    # for the context bot we always approve and finalize unless
+    # if tx is unknown
+    def shouldFinalizeTx(self, update, context, tx_id):
+        try:
+            # check if this tx exists
+            reason = None
+            should_finalize = self.isTx(context, tx_id)
+            return should_finalize, reason
+        except ValueError:
+            reason = t('slateboy.msg_unknown_tx')
+            should_finalize = False
+            return should_finalize, reason
+
+    def shouldFinalizeDepositTx(self, update, context, tx_id):
+        return self.shouldFinalizeTx(update, context, tx_id)
+
+    def shouldFinalizeWithdrawTx(self, update, context, tx_id):
+        return self.shouldFinalizeTx(update, context, tx_id)
+
     # EULA behavior
 
     # whether user has to see the terms and agreements
