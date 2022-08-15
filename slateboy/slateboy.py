@@ -87,7 +87,51 @@ def checkEULA(func):
             chat_id=user_id, text=EULA, reply_markup=reply_markup)
     return wrapper
 
-def checkMandatoryAmount(func):
+class parseRequestedAmountArgument:
+    def __init__(self, msg_missing, msg_invalid, is_mandatory=False, allowed_max=False):
+        self.is_mandatory = is_mandatory
+        self.msg_missing = msg_missing
+        self.msg_invalid = msg_invalid
+        self.allowed_max = allowed_max
+
+    def __call__(self, func):
+        @wraps
+        def wrapper(*args, **kwargs):
+            # restore the arguments
+            self = args[0]
+            update = args[1]
+            context = args[2]
+
+            # get the user_id
+            chat_id = update.message.chat.id
+            user_id = update.message.from_user.id
+
+            # check if there is amount specified
+            if len(context.args) == 0 and self.is_mandatory:
+                reply_text = t(self.msg_missing)
+                return update.context.bot.send_message(
+                    chat_id=chat_id, text=reply_text)
+
+            # validate the requested amount
+            requested_amount = None
+            try:
+                requested_amount = float(context.args[0])
+            except ValueError:
+                if self.allowed_max and context.args[0] == 'max':
+                    requested_amount = 'max'
+                elif self.is_mandatory:
+                    reply_text = t(self.msg_invalid).format(
+                        context.args[0])
+                    return update.context.bot.send_message(
+                        chat_id=chat_id, text=reply_text)
+
+            # either valid either ignored
+            kwargs['requested_amount'] = requested_amount
+            return func(*args, **kwargs)
+
+
+
+def parseRequestedAmountArgument(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         # restore the arguments
@@ -95,17 +139,17 @@ def checkMandatoryAmount(func):
         update = args[1]
         context = args[2]
 
-        # check if there is amount specified
-        if len(context.args) == 0:
-            # inform the user that has to specify the amount to use /deposit
-            # command, it is possible to deposit without specifying the amount
-            # by simply sending an SRS slatepack
-            reply_text = t('slateboy.msg_missing_amount')
-            return update.context.bot.send_message(chat_id=chat_id, text=reply_text)
-
-        # amount provided, we may continue
-        return func(*args, **kwargs)
-    return wrapper
+        # validate the request amount
+        requested_amount = None
+        try:
+            requested_amount = float(context.args[0])
+        except ValueError:
+            # inform the user the amount is invalid, but it is possible
+            # to just send a slatepack
+            reply_text = t('slateboy.msg_invalid_amount').format(
+                    context.args[0])
+            return update.context.bot.send_message(
+                    chat_id=chat_id, text=reply_text)
 
 
 # legit SlateBoy class!
@@ -180,7 +224,10 @@ class SlateBoy:
 
 
     @checkWallet
-    def handlerRequestWithdraw(self, update, context):
+    @parseRequestedAmountArgument(
+        'slateboy.msg_withdraw_missing_amount',
+        'slateboy.msg_withdraw_invalid_amount', allowed_max=True, is_mandatory=False)
+    def handlerRequestWithdraw(self, update, context, requested_amount=None):
         # get the user_id
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
@@ -281,23 +328,13 @@ class SlateBoy:
 
     @checkWallet
     @checkEULA
-    @checkMandatoryAmount
-    def handlerRequestDeposit(self, update, context):
+    @parseRequestedAmountArgument(
+        'slateboy.msg_deposit_missing_amount',
+        'slateboy.msg_deposit_invalid_amount', allowed_max=False, is_mandatory=True)
+    def handlerRequestDeposit(self, update, context, requested_amount=None):
         # get the user_id
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
-
-        # validate the request amount
-        requested_amount = None
-        try:
-            requested_amount = float(context.args[0])
-        except ValueError:
-            # inform the user the amount is invalid, but it is possible
-            # to just send a slatepack
-            reply_text = t('slateboy.msg_deposit_invalid_amount').format(
-                    context.args[0])
-            return update.context.bot.send_message(
-                    chat_id=chat_id, text=reply_text)
 
         # consult the personality if this deposit is approved
         success, reason, result, approved_amount = self.personality.canDeposit(
