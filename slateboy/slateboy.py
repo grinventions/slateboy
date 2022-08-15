@@ -53,6 +53,7 @@ def checkWallet(func):
         return func(*args, **kwargs)
     return wrapper
 
+
 def checkEULA(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -87,8 +88,41 @@ def checkEULA(func):
             chat_id=user_id, text=EULA, reply_markup=reply_markup)
     return wrapper
 
+
+class checkShouldIgnore:
+    def __init__(self, msg_reason_unknown):
+        self.msg_reason_unknown = msg_reason_unknown
+
+    def __call__(self, func):
+        @wraps
+        def wrapper(*args, **kwargs):
+            # restore the arguments
+            otherself = args[0]
+            update = args[1]
+            context = args[2]
+
+            # get the user_id
+            chat_id = update.message.chat.id
+            user_id = update.message.from_user.id
+
+            # check if personality wishes to reject this flow
+            ignore, reason = otherself.personality.shouldIgnore(update, context)
+            if ignore:
+                if reason is not None:
+                    return update.context.bot.send_message(
+                        chat_id=chat_id, text=reason)
+                # unknown reason but still ordered to ignore
+                reply_text = t(self.msg_reason_unknown)
+                return update.context.bot.send_message(
+                    chat_id=chat_id, text=reason)
+
+            # looks like the personality wishes to continue
+            return func(*args, **kwargs)
+
+
 class parseRequestedAmountArgument:
-    def __init__(self, msg_missing, msg_invalid, is_mandatory=False, allowed_max=False):
+    def __init__(self, msg_missing, msg_invalid,
+                 is_mandatory=False, allowed_max=False):
         self.is_mandatory = is_mandatory
         self.msg_missing = msg_missing
         self.msg_invalid = msg_invalid
@@ -98,7 +132,7 @@ class parseRequestedAmountArgument:
         @wraps
         def wrapper(*args, **kwargs):
             # restore the arguments
-            self = args[0]
+            otherself = args[0]
             update = args[1]
             context = args[2]
 
@@ -224,6 +258,7 @@ class SlateBoy:
 
 
     @checkWallet
+    @checkShouldIgnore('slateboy.msg_withdraw_ignored_unknown')
     @parseRequestedAmountArgument(
         'slateboy.msg_withdraw_missing_amount',
         'slateboy.msg_withdraw_invalid_amount', allowed_max=True, is_mandatory=False)
@@ -231,32 +266,6 @@ class SlateBoy:
         # get the user_id
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
-
-        # check if personality wishes to reject this flow
-        ignore, reason = self.personality.shouldIgnore(update, context)
-        if ignore:
-            if reason is not None:
-                return update.context.bot.send_message(
-                    chat_id=chat_id, text=reason)
-            # unknown reason but still ordered to ignore
-            reply_text = t('slateboy.msg_ignored_unknown')
-            return update.context.bot.send_message(
-                chat_id=chat_id, text=reason)
-
-        # validate the request amount
-        is_maximum_request = False
-        requested_amount = None
-
-        if len(context.args) == 0:
-            is_maximum_request = True
-        else:
-            try:
-                requested_amount = float(context.args[0])
-            except ValueError:
-                reply_text = t('slateboy.msg_withdraw_invalid_amount').format(
-                    context.args[0])
-                return update.context.bot.send_message(
-                    chat_id=chat_id, text=reply_text)
 
         # consult the personality
         success, reason, result, approved_amount = self.personality.canWithdraw(
@@ -328,6 +337,7 @@ class SlateBoy:
 
     @checkWallet
     @checkEULA
+    @checkShouldIgnore('slateboy.msg_deposit_ignored_unknown')
     @parseRequestedAmountArgument(
         'slateboy.msg_deposit_missing_amount',
         'slateboy.msg_deposit_invalid_amount', allowed_max=False, is_mandatory=True)
@@ -396,20 +406,10 @@ class SlateBoy:
                 chat_id=chat_id, text=msg)
 
 
+    @checkShouldIgnore('slateboy.msg_balance_ignored_unknown')
     def handlerBalance(self, update, context):
         # get the user_id
         chat_id = update.message.chat.id
-
-        # check if personality wishes to reject this flow
-        ignore, reason = self.personality.shouldIgnore(update, context)
-        if ignore:
-            if reason is not None:
-                return update.context.bot.send_message(
-                    chat_id=chat_id, text=reason)
-            # unknown reason but still ordered to ignore
-            reply_text = t('slateboy.msg_ignored_unknown')
-            return update.context.bot.send_message(
-                chat_id=chat_id, text=reason)
 
         # consult the personality to get the balance
         success, reason, balance = self.personality.getBalance(
@@ -436,22 +436,12 @@ class SlateBoy:
                 chat_id=chat_id, text=reply_text)
 
 
+    @checkShouldIgnore('slateboy.msg_generic_ignored_unknown')
     def genericTextHandler(self, update, context):
         # get the user_id and the message_id
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
         message_id = update.message.message_id
-
-        # check if personality wishes to reject this flow
-        ignore, reason = self.personality.shouldIgnore(update, context)
-        if ignore:
-            if reason is not None:
-                return update.context.bot.send_message(
-                    chat_id=chat_id, text=reason)
-            # unknown reason but still ordered to ignore
-            reply_text = t('slateboy.msg_ignored_unknown')
-            return update.context.bot.send_message(
-                chat_id=chat_id, text=reason)
 
         # does it contain a slatepack?
         contains_slatepack, slatepack = self.containsSlatepack(update.message.text)
