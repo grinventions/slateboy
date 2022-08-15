@@ -2,6 +2,8 @@ from __future__ import unicode_literals
 
 import re
 
+from functools import wraps
+
 from telegram.ext import Updater, CommandHandler, MessageHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -29,6 +31,24 @@ from slateboy.defaults import default_callback_job_accounting
 # policy configuration values
 from slateboy.values import UserBehavior, BotBehavior
 
+# just bunch of wrappers to avoid repeating code
+
+def walletReady(func):
+    @wraps(func)
+    def wrapper(self, update, context):
+        # get the user_id
+        chat_id = update.message.chat.id
+        user_id = update.message.from_user.id
+
+        # check if wallet is operational
+        is_wallet_ready, reason = self.isWalletReady()
+        if not is_wallet_ready:
+            return update.context.bot.send_message(
+                chat_id=chat_id, text=reason)
+        return func(self, update, context)
+    return wrapper
+
+# legit SlateBoy class!
 
 class SlateBoy:
     def __init__(self, name, api_key, personality, config={}):
@@ -99,15 +119,11 @@ class SlateBoy:
         self.updater.idle()
 
 
+    @walletReady
     def handlerRequestWithdraw(self, update, context):
         # get the user_id
         chat_id = update.message.chat.id
-
-        # check if wallet is operational
-        is_wallet_ready, reason = self.isWalletReady()
-        if not is_wallet_ready:
-            return update.context.bot.send_message(
-                chat_id=chat_id, text=reason)
+        user_id = update.message.from_user.id
 
         # check if personality wishes to reject this flow
         ignore, reason = self.personality.shouldIgnore(update, context)
@@ -203,16 +219,11 @@ class SlateBoy:
                 chat_id=chat_id, text=msg)
 
 
+    @walletReady
     def handlerRequestDeposit(self, update, context):
         # get the user_id
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
-
-        # check if wallet is operational
-        is_wallet_ready, reason = self.isWalletReady()
-        if not is_wallet_ready:
-            return update.context.bot.send_message(
-                chat_id=chat_id, text=reason)
 
         # check if the personality wishes this user to see the EULA
         needs_to_see, EULA, EULA_verion = self.personality.shouldSeeEULA(
@@ -448,6 +459,7 @@ class SlateBoy:
 
     # wrappers
 
+    @walletReady
     def processS1Slatepack(self, update, context, slatepack):
         # get the user_id and the message_id
         chat_id = update.message.chat.id
@@ -459,7 +471,7 @@ class SlateBoy:
         if needs_to_see:
             return self.displayEULA(context, EULA, EULA_verion, user_id)
 
-        # get the amount from the slatepacj
+        # get the amount from the slatepack
         requested_amount = slate.get('amt', -1)
         if requested_amount == -1:
             reply_text = t('slateboy.msg_invalid_slatepack')
@@ -492,9 +504,11 @@ class SlateBoy:
         # done with the S1 flow
         return None
 
+    @walletReady
     def processS2Slatepack(self, update, context, slatepack):
         pass
 
+    @walletReady
     def processI2Slatepack(update, context, slatepack):
         pass
 
