@@ -87,6 +87,26 @@ def checkEULA(func):
             chat_id=user_id, text=EULA, reply_markup=reply_markup)
     return wrapper
 
+def checkMandatoryAmount(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # restore the arguments
+        self = args[0]
+        update = args[1]
+        context = args[2]
+
+        # check if there is amount specified
+        if len(context.args) == 0:
+            # inform the user that has to specify the amount to use /deposit
+            # command, it is possible to deposit without specifying the amount
+            # by simply sending an SRS slatepack
+            reply_text = t('slateboy.msg_missing_amount')
+            return update.context.bot.send_message(chat_id=chat_id, text=reply_text)
+
+        # amount provided, we may continue
+        return func(*args, **kwargs)
+    return wrapper
+
 
 # legit SlateBoy class!
 
@@ -261,18 +281,11 @@ class SlateBoy:
 
     @checkWallet
     @checkEULA
+    @checkMandatoryAmount
     def handlerRequestDeposit(self, update, context):
         # get the user_id
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
-
-        # check if there is amount specified
-        if len(context.args) == 0:
-            # inform the user that has to specify the amount to use /deposit
-            # command, it is possible to deposit without specifying the amount
-            # by simply sending an SRS slatepack
-            reply_text = t('slateboy.msg_deposit_missing_amount')
-            return update.context.bot.send_message(chat_id=chat_id, text=reply_text)
 
         # validate the request amount
         requested_amount = None
