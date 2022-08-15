@@ -33,7 +33,7 @@ from slateboy.values import UserBehavior, BotBehavior
 
 # just bunch of wrappers to avoid repeating code
 
-def walletReady(func):
+def checkWallet(func):
     @wraps(func)
     def wrapper(self, update, context):
         # get the user_id
@@ -47,6 +47,36 @@ def walletReady(func):
                 chat_id=chat_id, text=reason)
         return func(self, update, context)
     return wrapper
+
+def checkEULA(func):
+    @wraps(func)
+    def wrapper(self, update, context):
+        # get the user_id
+        chat_id = update.message.chat.id
+        user_id = update.message.from_user.id
+
+        # check if the personality wishes this user to see the EULA
+        needs_to_see, EULA, EULA_verion = self.personality.shouldSeeEULA(
+            update, context)
+        if not needs_to_see:
+            return func(self, update, context)
+
+        button_msg_approve = t('slateboy.eula_approve')
+        button_msg_deny = t('slateboy.eula_deny')
+        callback_data_approve = 'eula-approve-' + EULA_verion
+        callback_data_deny = 'eula-deny-' + EULA_verion
+        reply_text = t('slateboy.msg_eula_info')
+        update.context.bot.send_message(chat_id=user_id, text=reply_text)
+        keyboard = [
+            [InlineKeyboardButton(
+                button_msg_approve, callback_data=callback_data_approve)],
+            [InlineKeyboardButton(
+                button_msg_deny, callback_data=callback_data_deny)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        return context.bot.send_message(
+            chat_id=user_id, text=EULA, reply_markup=reply_markup)
+    return wrapper
+
 
 # legit SlateBoy class!
 
@@ -119,7 +149,7 @@ class SlateBoy:
         self.updater.idle()
 
 
-    @walletReady
+    @checkWallet
     def handlerRequestWithdraw(self, update, context):
         # get the user_id
         chat_id = update.message.chat.id
@@ -219,17 +249,12 @@ class SlateBoy:
                 chat_id=chat_id, text=msg)
 
 
-    @walletReady
+    @checkWallet
+    @checkEULA
     def handlerRequestDeposit(self, update, context):
         # get the user_id
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
-
-        # check if the personality wishes this user to see the EULA
-        needs_to_see, EULA, EULA_verion = self.personality.shouldSeeEULA(
-            update, context)
-        if needs_to_see:
-            return self.displayEULA(context, EULA, EULA_verion, user_id)
 
         # check if there is amount specified
         if len(context.args) == 0:
@@ -431,25 +456,9 @@ class SlateBoy:
             return self.processI2Slatepack(update, context, slatepack)
 
 
-    def displayEULA(self, context, EULA, EULA_verion, user_id):
-        button_msg_approve = t('slateboy.eula_approve')
-        button_msg_deny = t('slateboy.eula_deny')
-        callback_data_approve = 'eula-approve-' + EULA_verion
-        callback_data_deny = 'eula-deny-' + EULA_verion
-        reply_text = t('slateboy.msg_eula_info')
-        update.context.bot.send_message(chat_id=user_id, text=reply_text)
-        keyboard = [
-            [InlineKeyboardButton(
-                button_msg_approve, callback_data=callback_data_approve)],
-            [InlineKeyboardButton(
-                button_msg_deny, callback_data=callback_data_deny)]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        return context.bot.send_message(
-            chat_id=user_id, text=EULA, reply_markup=reply_markup)
-
-
     def jobTXs(self, context):
         self.callback_job_txs(context, self.walletQueryConfirmed, self.config_job_txs)
+
 
     def jobWalletSync(self, context, user_id, EULA, EULA_verion):
         pass
@@ -459,17 +468,12 @@ class SlateBoy:
 
     # wrappers
 
-    @walletReady
+    @checkWallet
+    @checkEULA
     def processS1Slatepack(self, update, context, slatepack):
         # get the user_id and the message_id
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
-
-        # check if the personality wishes this user to see the EULA
-        needs_to_see, EULA, EULA_verion = self.personality.shouldSeeEULA(
-            update, context)
-        if needs_to_see:
-            return self.displayEULA(context, EULA, EULA_verion, user_id)
 
         # get the amount from the slatepack
         requested_amount = slate.get('amt', -1)
@@ -504,11 +508,11 @@ class SlateBoy:
         # done with the S1 flow
         return None
 
-    @walletReady
+    @checkWallet
     def processS2Slatepack(self, update, context, slatepack):
         pass
 
-    @walletReady
+    @checkWallet
     def processI2Slatepack(update, context, slatepack):
         pass
 
