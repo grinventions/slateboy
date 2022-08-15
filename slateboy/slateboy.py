@@ -35,7 +35,12 @@ from slateboy.values import UserBehavior, BotBehavior
 
 def checkWallet(func):
     @wraps(func)
-    def wrapper(self, update, context):
+    def wrapper(*args, **kwargs):
+        # restore the arguments
+        self = args[0]
+        update = args[1]
+        context = args[2]
+
         # get the user_id
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
@@ -45,12 +50,17 @@ def checkWallet(func):
         if not is_wallet_ready:
             return update.context.bot.send_message(
                 chat_id=chat_id, text=reason)
-        return func(self, update, context)
+        return func(*args, **kwargs)
     return wrapper
 
 def checkEULA(func):
     @wraps(func)
-    def wrapper(self, update, context):
+    def wrapper(*args, **kwargs):
+        # restore the arguments
+        self = args[0]
+        update = args[1]
+        context = args[2]
+
         # get the user_id
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
@@ -59,7 +69,7 @@ def checkEULA(func):
         needs_to_see, EULA, EULA_verion = self.personality.shouldSeeEULA(
             update, context)
         if not needs_to_see:
-            return func(self, update, context)
+            return func(*args, **kwargs)
 
         button_msg_approve = t('slateboy.eula_approve')
         button_msg_deny = t('slateboy.eula_deny')
