@@ -126,6 +126,33 @@ class BlankPersonality:
     def incomingTextGroup(self, update, context, contains_slatepack: bool):
         return True
 
+    # bot messages in the pipeline
+    def customDepositInstructions(self, update, context):
+        send_instructions = False
+        custom_instructions = None
+        return send_instructions, custom_instructions
+
+    def customDepositSlatepackFormatting(self, update, context):
+        custom_slatepack_formatting = None
+        return custom_slatepack_formatting
+
+    def customDepositFinalMessage(self, update, context):
+        custom_final_message = None
+        return custom_final_message
+
+    def customWithdrawInstructions(self, update, context):
+        send_instructions = False
+        custom_instructions = None
+        return send_instructions, custom_instructions
+
+    def customWithdrawSlatepackFormatting(self, update, context):
+        custom_slatepack_formatting = None
+        return custom_slatepack_formatting
+
+    def customWithdrawFinalMessage(self, update, context):
+        custom_final_message = None
+        return custom_final_message
+
     # renaming standard commands
     def renameStandardCommands(self):
         return {}
