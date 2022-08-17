@@ -4,7 +4,7 @@ import re
 
 from functools import wraps
 
-from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler
+from telegram.ext import Updater, Filters, CommandHandler, MessageHandler, CallbackQueryHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from i18n.translator import t
@@ -176,6 +176,8 @@ class SlateBoy:
             self.updater = Updater(bot=self.bot)
         else:
             self.updater = Updater(self.api_key, use_context=True)
+
+        # register standard commands
         self.updater.dispatcher.add_handler(
             CommandHandler(names.get('withdraw', 'withdraw'),
                            self.handlerRequestWithdraw))
@@ -198,16 +200,16 @@ class SlateBoy:
 
         # transaction status update job for deposits and withdrawals
         self.updater.job_queue.run_repeating(
-            self.jobTXs, interval=self.frequency_job_txs,
+            self.jobTXs, interval=frequency_job_txs,
             first=first_job_txs)
 
         # wallet refresh job for keeping it in sync
         self.updater.job_queue.run_repeating(
-            self.jobWalletSync, interval=self.frequency_wallet_sync,
+            self.jobWalletSync, interval=frequency_wallet_sync,
             first=first_wallet_sync)
 
         # register custom jobs requested by the personality
-        custom_jobs = registerCustomJobs()
+        custom_jobs = self.personality.registerCustomJobs()
         for fist_interval, frequency, function in custom_jobs:
             self.updater.job_queue.run_repeating(
                 function, interval=frequency,
@@ -218,9 +220,13 @@ class SlateBoy:
             CallbackQueryHandler(self.callbackQueryHandler))
 
 
-    def run(self):
+    def run(self, idle=True):
         self.updater.start_polling()
-        self.updater.idle()
+        if idle:
+            self.updater.idle()
+
+    def stop(self):
+        self.updater.stop()
 
     @checkShouldIgnore('slateboy.msg_callback_query_ignored_unknown')
     def callbackQueryHandler(self, update, context):
@@ -484,7 +490,7 @@ class SlateBoy:
     def jobTXs(self, context):
         pass
 
-    def jobWalletSync(self, context, user_id, EULA, EULA_verion):
+    def jobWalletSync(self, context):
         pass
 
     # wrappers
