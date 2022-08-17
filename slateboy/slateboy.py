@@ -46,7 +46,7 @@ def checkWallet(func):
         user_id = update.message.from_user.id
 
         # check if wallet is operational
-        is_wallet_ready, reason = self.isWalletReady()
+        is_wallet_ready, reason = self.wallet.isReady()
         if not is_wallet_ready:
             return update.context.bot.send_message(
                 chat_id=chat_id, text=reason)
@@ -189,10 +189,11 @@ def parseRequestedAmountArgument(func):
 # legit SlateBoy class!
 
 class SlateBoy:
-    def __init__(self, name, api_key, personality, config={}):
+    def __init__(self, name, api_key, personality, wallet_provider, config={}):
         self.name = name
         self.api_key = api_key
         self.namespace = namespace
+        self.wallet = wallet_provider
 
         # configuration
         self.config = config
@@ -241,7 +242,7 @@ class SlateBoy:
 
         # wallet refresh job for keeping it in sync
         self.updater.job_queue.run_repeating(
-            self.jobWalletSynce, interval=self.frequency_wallet_sync,
+            self.jobWalletSync, interval=self.frequency_wallet_sync,
             first=first_wallet_sync)
 
         # register custom jobs requested by the personality
@@ -316,7 +317,7 @@ class SlateBoy:
 
         # if reached here, it means it is approved
         # begin the SRS flow
-        success, reason, slatepack, tx_id = self.walletSend(approved_amount)
+        success, reason, slatepack, tx_id = self.wallet.send(approved_amount)
 
         # check if for some reason it has failed,
         # example reason could be all the outputs are locked at the moment
@@ -333,7 +334,7 @@ class SlateBoy:
         # did it not work for some reason?
         if not success:
             # release the locked outputs
-            self.walletReleaseLock(tx_id)
+            self.wallet.releaseLock(tx_id)
 
             # inform the user of the failure
             update.context.bot.send_message(
@@ -377,7 +378,7 @@ class SlateBoy:
 
         # if reached here, it means it is approved
         # begin the RSR flow
-        success, reason, slatepack, tx_id = self.walletInvoice(approved_amount)
+        success, reason, slatepack, tx_id = self.wallet.invoice(approved_amount)
 
         # check if for some reason it has failed
         if not success:
@@ -393,7 +394,7 @@ class SlateBoy:
         # did it not work for some reason?
         if not success:
             # release the locked outputs
-            self.walletReleaseLock(tx_id)
+            self.wallet.releaseLock(tx_id)
 
             # inform the user of the failure
             update.context.bot.send_message(
@@ -485,7 +486,7 @@ class SlateBoy:
             return None
 
         # looks like it is direct message with a slatepack
-        slate = self.walletDecodeSlatepack(slatepack)
+        slate = self.wallet.decodeSlatepack(slatepack)
         tx_id = slate.get('id', -1)
         sta = slate.get('sta', -1)
 
@@ -519,14 +520,10 @@ class SlateBoy:
 
 
     def jobTXs(self, context):
-        self.callback_job_txs(context, self.walletQueryConfirmed, self.config_job_txs)
-
+        pass
 
     def jobWalletSync(self, context, user_id, EULA, EULA_verion):
         pass
-
-
-    # GRIN wallet methods TODO
 
     # wrappers
 
@@ -558,7 +555,7 @@ class SlateBoy:
 
         # if reached here, it means it is approved
         # begin the SRS flow
-        success, reason, slatepack, tx_id = self.walletReceive(approved_amount)
+        success, reason, slatepack, tx_id = self.wallet.receive(approved_amount) # TODO this should be slatepack!
 
         # check if for some reason it has failed
         if not success:
@@ -575,7 +572,7 @@ class SlateBoy:
         # did it not work for some reason?
         if not success:
             # release the locked outputs
-            self.walletReleaseLock(tx_id)
+            self.wallet.releaseLock(tx_id)
 
             # inform the user of the failure
             update.context.bot.send_message(
@@ -721,7 +718,7 @@ class SlateBoy:
             return shall_continue
 
         # finalization approved
-        success, reason, finalized_slatepack = self.walletFinalize(slatepack)
+        success, reason, finalized_slatepack = self.wallet.finalize(slatepack)
 
         # did it not work for some reason?
         if not success:
