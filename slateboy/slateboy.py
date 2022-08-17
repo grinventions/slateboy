@@ -9,27 +9,6 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from i18n.translator import t
 
-# default context checkers and initiators
-from slateboy.defaults import default_is_bank_balance_initiated
-from slateboy.defaults import default_initiate_bank_balance
-
-from slateboy.defaults import default_is_user_balance_initiated
-from slateboy.defaults import default_initiate_user_balance
-
-# default methods for handling operations
-from slateboy.defaults import default_balance
-from slateboy.defaults import default_callback_withdraw_lock
-from slateboy.defaults import default_callback_deposit_lock
-from slateboy.defaults import default_is_txid_known
-from slateboy.defaults import default_callback_withdraw
-from slateboy.defaults import default_callback_deposit
-
-# default job handling
-from slateboy.defaults import default_callback_job_txs
-from slateboy.defaults import default_callback_job_accounting
-
-# policy configuration values
-from slateboy.values import UserBehavior, BotBehavior
 
 # just bunch of wrappers to avoid repeating code
 
@@ -164,32 +143,11 @@ class parseRequestedAmountArgument:
             return func(*args, **kwargs)
 
 
-
-def parseRequestedAmountArgument(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        # restore the arguments
-        self = args[0]
-        update = args[1]
-        context = args[2]
-
-        # validate the request amount
-        requested_amount = None
-        try:
-            requested_amount = float(context.args[0])
-        except ValueError:
-            # inform the user the amount is invalid, but it is possible
-            # to just send a slatepack
-            reply_text = t('slateboy.msg_invalid_amount').format(
-                    context.args[0])
-            return update.context.bot.send_message(
-                    chat_id=chat_id, text=reply_text)
-
-
 # legit SlateBoy class!
 
 class SlateBoy:
-    def __init__(self, name, api_key, personality, wallet_provider, config={}):
+    def __init__(self, name, api_key, personality, wallet_provider, namespace='slateboy', config={}, bot=None):
+        self.bot = bot
         self.name = name
         self.api_key = api_key
         self.namespace = namespace
@@ -214,7 +172,10 @@ class SlateBoy:
         names = self.personality.renameStandardCommands()
 
         # command callbacks
-        self.updater = Updater(self.api_key, use_context=True)
+        if self.bot is not None:
+            self.updater = Updater(bot=self.bot)
+        else:
+            self.updater = Updater(self.api_key, use_context=True)
         self.updater.dispatcher.add_handler(
             CommandHandler(names.get('withdraw', 'withdraw'),
                            self.handlerRequestWithdraw))
@@ -297,7 +258,8 @@ class SlateBoy:
     @checkShouldIgnore('slateboy.msg_withdraw_ignored_unknown')
     @parseRequestedAmountArgument(
         'slateboy.msg_withdraw_missing_amount',
-        'slateboy.msg_withdraw_invalid_amount', allowed_max=True, is_mandatory=False)
+        'slateboy.msg_withdraw_invalid_amount',
+        is_mandatory=False, allowed_max=True)
     def handlerRequestWithdraw(self, update, context, requested_amount=None):
         # get the user_id
         chat_id = update.message.chat.id

@@ -1,7 +1,4 @@
 class BlankPersonality:
-    def __init__(self, slateboy):
-        self.slateboy = slateboy
-
     # getting the balance
     # returns one of the following types
     #
@@ -106,6 +103,11 @@ class BlankPersonality:
 
     def deniedEULA(self, update, context, EULA_verion):
         pass
+
+    # handler for button clicks
+
+    def buttonPressed(self, update, context, data):
+        return None
 
     # what to do if being added to the group, should leave it?
     def shouldLeave(self, update, context):

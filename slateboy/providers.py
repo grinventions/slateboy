@@ -1,7 +1,4 @@
 class WalletProvider:
-    def __init__(self, slateboy):
-        self.slateboy = slateboy
-
     # returns success (bool) reason (str)
     def sync(self):
         raise Exception('Unimplemented')
