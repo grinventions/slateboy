@@ -101,10 +101,10 @@ class BlankPersonality:
     def shouldSeeEULA(self, update, context):
         return False
 
-    def approvedEULA(self, update, context):
+    def approvedEULA(self, update, context, EULA_verion):
         pass
 
-    def deniedEULA(self, update, context):
+    def deniedEULA(self, update, context, EULA_verion):
         pass
 
     # what to do if being added to the group, should leave it?

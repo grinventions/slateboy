@@ -4,7 +4,7 @@ import re
 
 from functools import wraps
 
-from telegram.ext import Updater, CommandHandler, MessageHandler
+from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackQueryHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from i18n.translator import t
@@ -251,10 +251,45 @@ class SlateBoy:
                 function, interval=frequency,
                 first=first_interval)
 
+        # callback query for button presses
+        self.updater.dispatcher.add_handler(
+            CallbackQueryHandler(self.callbackQueryHandler))
+
 
     def run(self):
         self.updater.start_polling()
         self.updater.idle()
+
+    @checkShouldIgnore('slateboy.msg_callback_query_ignored_unknown')
+    def callbackQueryHandler(self, update, context):
+        # get the user_id
+        chat_id = update.message.chat.id
+        user_id = update.message.from_user.id
+
+        # extract the query
+        query = update.callback_query
+        query.answer()
+
+        # check if user approved the EULA
+        if query.data.startswith('eula-approve-'):
+            EULA_version = query.data.split('eula-approve-')[1]
+            reply_markup = self.personality.approvedEULA(
+                update, context, EULA_version)
+            query.edit_message_reply_markup(reply_markup=None)
+            return False
+
+        # check if user denied the EULA
+        if query.data.startswith('eula-deny-'):
+            EULA_version = query.data.split('eula-deny-')[1]
+            reply_markup = self.personality.deniedEULA(
+                update, context, EULA_version)
+            query.edit_message_reply_markup(reply_markup=None)
+            return False
+
+        # some custom logic imposed by the personality, let it handle
+        reply_markup = self.personality.buttonPressed(update, context, query.data)
+        query.edit_message_reply_markup(reply_markup=None)
+        return False
 
 
     @checkWallet
