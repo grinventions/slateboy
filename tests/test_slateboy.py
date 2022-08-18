@@ -48,20 +48,33 @@ class TestSlateBoy(unittest.TestCase):
         self.slateboy.initiate()
         self.slateboy.run(idle=False)
 
+
     def tearDown(self):
         self.slateboy.stop()
+
+
+    def interact(self, message):
+        nb_messages = len(self.mock_bot.sent_messages)
+        update = self.mg.get_message(
+                text='/balance', parse_mode='HTML', user=self.alice, chat=self.chat)
+        self.mock_bot.insertUpdate(update)
+        self.assertEqual(len(self.mock_bot.sent_messages), nb_messages + 1)
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+        return response
+
 
     def testDeposit(self):
         # user checks balance, there is nothing
         success, reason, balance = True, None, (0.0, 0.0, 0.0, 0.0)
         with patch('slateboy.personality.BlankPersonality.getBalance',
                    return_value=(success, reason, balance)):
-            update = self.mg.get_message(
-                text='/balance', parse_mode='HTML', user=self.alice, chat=self.chat)
-            self.mock_bot.insertUpdate(update)
-        self.assertEqual(len(self.mock_bot.sent_messages), 1)
-        sent = self.mock_bot.sent_messages[0]
-        self.assertEqual(sent['text'], 'Spendable: 0.0\nAwaiting confirmation: 0.0\nAwaiting finalization: 0.0\nLocked: 0.0')
+            response = self.interact('/balance')
+            expected_response = 'Spendable: 0.0\n' \
+                'Awaiting confirmation: 0.0\n' \
+                'Awaiting finalization: 0.0\n' \
+                'Locked: 0.0'
+            self.assertEqual(response, expected_response)
 
         # user tries the deposit is forced to see the EULA
         # user checks balance, there is nothing
