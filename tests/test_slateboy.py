@@ -1,7 +1,12 @@
 import unittest
 import warnings
+import os
+
+from i18n import resource_loader
+from i18n import config as i18config
 
 # from telegram.warning import TelegramDeprecationWarning
+from unittest.mock import patch, Mock, MagicMock
 
 from ptbtest import ChatGenerator
 from ptbtest import MessageGenerator
@@ -11,6 +16,14 @@ from ptbtest import UserGenerator
 from slateboy.slateboy import SlateBoy
 from slateboy.personality import BlankPersonality
 from slateboy.providers import WalletProvider
+
+TRANSLATIONS_DIRECTORY = os.path.dirname(os.path.abspath(__file__)) + os.sep + '../translations' + os.sep
+i18config.set('file_format', 'json')
+i18config.set('load_path', [TRANSLATIONS_DIRECTORY])
+i18config.set('filename_format', '{namespace}.{locale}.{format}')
+i18config.set('locale', 'en')
+resource_loader.init_json_loader()
+
 
 class TestSlateBoy(unittest.TestCase):
     def setUp(self):
@@ -27,7 +40,6 @@ class TestSlateBoy(unittest.TestCase):
         # message generator and updater (for use with the bot.)
         self.mg = MessageGenerator(self.mock_bot)
         # slateboy
-        # mocks https://stackoverflow.com/a/57187349/2398574 ?
         self.personality = BlankPersonality()
         self.wallet_provider = WalletProvider()
         self.slateboy = SlateBoy(
@@ -41,12 +53,16 @@ class TestSlateBoy(unittest.TestCase):
 
     def testDeposit(self):
         # user checks balance, there is nothing
-        update = self.mg.get_message(
-            text='/balance', parse_mode='HTML', user=self.alice, chat=self.chat)
-        self.mock_bot.insertUpdate(update)
+        success, reason, balance = True, None, (0.0, 0.0, 0.0, 0.0)
+        with patch('slateboy.personality.BlankPersonality.getBalance',
+                   return_value=(success, reason, balance)):
+            update = self.mg.get_message(
+                text='/balance', parse_mode='HTML', user=self.alice, chat=self.chat)
+            self.mock_bot.insertUpdate(update)
         self.assertEqual(len(self.mock_bot.sent_messages), 1)
         sent = self.mock_bot.sent_messages[0]
-        self.assertEqual(sent['text'], '/balance')
+        self.assertEqual(sent['text'], 'Spendable: 0.0\nAwaiting confirmation: 0.0\nAwaiting finalization: 0.0\nLocked: 0.0')
+
         # user tries the deposit is forced to see the EULA
         # user checks balance, there is nothing
         # user denies the EULA

@@ -73,7 +73,7 @@ class checkShouldIgnore:
         self.msg_reason_unknown = msg_reason_unknown
 
     def __call__(self, func):
-        @wraps
+        @wraps(func)
         def wrapper(*args, **kwargs):
             # restore the arguments
             otherself = args[0]
@@ -97,6 +97,7 @@ class checkShouldIgnore:
 
             # looks like the personality wishes to continue
             return func(*args, **kwargs)
+        return wrapper
 
 
 class parseRequestedAmountArgument:
@@ -177,6 +178,8 @@ class SlateBoy:
         else:
             self.updater = Updater(self.api_key, use_context=True)
 
+        print(self.handlerBalance)
+
         # register standard commands
         self.updater.dispatcher.add_handler(
             CommandHandler(names.get('withdraw', 'withdraw'),
@@ -218,7 +221,6 @@ class SlateBoy:
         # callback query for button presses
         self.updater.dispatcher.add_handler(
             CallbackQueryHandler(self.callbackQueryHandler))
-
 
     def run(self, idle=True):
         self.updater.start_polling()
@@ -408,10 +410,13 @@ class SlateBoy:
         # personality can also provide just separate balances
         # as a tuple and let the slateboy format it
         spendable, awaiting_confirmation, awaiting_finalization, locked = balance
-        reply_text = t('slateboy.msg_balance').format(
-            str(spendable), str(awaiting_confirmation),
-            str(awaiting_finalization), str(locked))
-        update.context.bot.send_message(
+        reply_text = t('slateboy.msg_balance').format(**{
+            'spendable': str(spendable),
+            'awaiting_confirmation': str(awaiting_confirmation),
+            'awaiting_finalization': str(awaiting_finalization),
+            'locked': str(locked)
+        })
+        context.bot.send_message(
             chat_id=chat_id, text=reply_text)
         shall_continue = False
         return shall_continue
