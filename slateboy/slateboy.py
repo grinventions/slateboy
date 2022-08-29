@@ -56,7 +56,8 @@ def checkEULA(func):
         callback_data_approve = 'eula-approve-' + EULA_verion
         callback_data_deny = 'eula-deny-' + EULA_verion
         reply_text = t('slateboy.msg_eula_info')
-        update.context.bot.send_message(chat_id=user_id, text=reply_text)
+
+        context.bot.send_message(chat_id=user_id, text=reply_text)
         keyboard = [
             [InlineKeyboardButton(
                 button_msg_approve, callback_data=callback_data_approve)],
@@ -88,12 +89,12 @@ class checkShouldIgnore:
             ignore, reason = otherself.personality.shouldIgnore(update, context)
             if ignore:
                 if reason is not None:
-                    return update.context.bot.send_message(
+                    return context.bot.send_message(
                         chat_id=chat_id, text=reason)
                 # unknown reason but still ordered to ignore
                 reply_text = t(self.msg_reason_unknown)
-                return update.context.bot.send_message(
-                    chat_id=chat_id, text=reason)
+                return context.bot.send_message(
+                    chat_id=chat_id, text=reply_text)
 
             # looks like the personality wishes to continue
             return func(*args, **kwargs)
@@ -109,7 +110,7 @@ class parseRequestedAmountArgument:
         self.allowed_max = allowed_max
 
     def __call__(self, func):
-        @wraps
+        @wraps(func)
         def wrapper(*args, **kwargs):
             # restore the arguments
             otherself = args[0]
@@ -123,7 +124,7 @@ class parseRequestedAmountArgument:
             # check if there is amount specified
             if len(context.args) == 0 and self.is_mandatory:
                 reply_text = t(self.msg_missing)
-                return update.context.bot.send_message(
+                return context.bot.send_message(
                     chat_id=chat_id, text=reply_text)
 
             # validate the requested amount
@@ -136,12 +137,13 @@ class parseRequestedAmountArgument:
                 elif self.is_mandatory:
                     reply_text = t(self.msg_invalid).format(
                         context.args[0])
-                    return update.context.bot.send_message(
+                    return context.bot.send_message(
                         chat_id=chat_id, text=reply_text)
 
             # either valid either ignored
             kwargs['requested_amount'] = requested_amount
             return func(*args, **kwargs)
+        return wrapper
 
 
 # legit SlateBoy class!
@@ -177,8 +179,6 @@ class SlateBoy:
             self.updater = Updater(bot=self.bot)
         else:
             self.updater = Updater(self.api_key, use_context=True)
-
-        print(self.handlerBalance)
 
         # register standard commands
         self.updater.dispatcher.add_handler(
@@ -279,7 +279,8 @@ class SlateBoy:
 
         # process the personality's response
         shall_continue = self.validateFinancialOperation(
-            success, reason, result,
+            update, context, success, reason, result,
+            requested_amount, approved_amount,
             'slateboy.msg_withdraw_rejected_known',
             'slateboy.msg_withdraw_rejected_unknown')
         if not shall_continue:
@@ -328,7 +329,8 @@ class SlateBoy:
     @checkShouldIgnore('slateboy.msg_deposit_ignored_unknown')
     @parseRequestedAmountArgument(
         'slateboy.msg_deposit_missing_amount',
-        'slateboy.msg_deposit_invalid_amount', allowed_max=False, is_mandatory=True)
+        'slateboy.msg_deposit_invalid_amount',
+        allowed_max=False, is_mandatory=True)
     def handlerRequestDeposit(self, update, context, requested_amount=None):
         # get the user_id
         chat_id = update.message.chat.id
@@ -340,7 +342,8 @@ class SlateBoy:
 
         # process the personality's response
         shall_continue = self.validateFinancialOperation(
-            success, reason, result,
+            update, context, success, reason, result,
+            requested_amount, approved_amount,
             'slateboy.msg_deposit_rejected_known',
             'slateboy.msg_deposit_rejected_unknown')
         if not shall_continue:
@@ -520,7 +523,8 @@ class SlateBoy:
 
         # process the personality's response
         shall_continue = self.validateFinancialOperation(
-            success, reason, result,
+            update, context, success, reason, result,
+            requested_amount, approved_amount,
             'slateboy.msg_deposit_rejected_known',
             'slateboy.msg_deposit_rejected_unknown')
         if not shall_continue:
@@ -595,27 +599,31 @@ class SlateBoy:
         return contains_slatepack, slatepack
 
     def validateFinancialOperation(
-            self, processing_success, reason_of_failure, allowed,
-            reject_reason_known, reject_reason_unknown):
+            self, update, context, processing_success, reason_of_failure,
+            allowed, requested_amount, approved_amount, reject_reason_known, reject_reason_unknown):
+        # get the user_id and the message_id
+        chat_id = update.message.chat.id
+        user_id = update.message.from_user.id
+
         # check if user has violated ny terms
-        if not result and reason is None and approved_amount is not None:
+        if not allowed and reason_of_failure is None and approved_amount is not None:
             reply_text = t(reject_reason_known).format(
                 str(requested_amount), str(approved_amount))
-            update.context.bot.send_message(
+            context.bot.send_message(
                 chat_id=chat_id, text=reply_text)
             shall_continue = False
             return shall_continue
 
         # there might have been custom logic reason why the personality
         # has decided to reject this request
-        if not result and reason is not None:
-            update.context.bot.send_message(
-                chat_id=chat_id, text=reason)
+        if not allowed and reason_of_failure is not None:
+            context.bot.send_message(
+                chat_id=chat_id, text=reason_of_failure)
             shall_continue = False
             return shall_continue
 
         # rejected for unknown reasons
-        if not result:
+        if not allowed:
             reply_text = t(reject_reason_unknown)
             update.context.bot.send_message(
                 chat_id=chat_id, text=reply_text)
