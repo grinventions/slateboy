@@ -314,7 +314,7 @@ class SlateBoy:
             return shall_continue
 
         # complete the RSR flow initialization
-        shall_continue = completeFinancialOperation(
+        shall_continue = self.completeFinancialOperation(
             update, context, slatepack,
             self.personality.customWithdrawInstructions,
             self.personality.customWithdrawSlatepackFormatting,
@@ -376,7 +376,7 @@ class SlateBoy:
             return shall_continue
 
         # complete the RSR flow initialization
-        shall_continue = completeFinancialOperation(
+        shall_continue = self.completeFinancialOperation(
             update, context, slatepack,
             self.personality.customDepositInstructions,
             self.personality.customDepositSlatepackFormatting,
@@ -558,7 +558,7 @@ class SlateBoy:
             return shall_continue
 
         # complete the SRS flow instructions
-        shall_continue = completeFinancialOperation(
+        shall_continue = self.completeFinancialOperation(
             update, context, slatepack,
             self.personality.customSRSDepositInstructions,
             self.personality.customSRSDepositSlatepackFormatting,
@@ -648,27 +648,27 @@ class SlateBoy:
         if send_instructions:
             if custom_instructions is None:
                 reply_text = t(standard_instructions)
-                update.context.bot.send_message(
+                context.bot.send_message(
                     chat_id=chat_id, text=reply_text)
             else:
-                update.context.bot.send_message(
+                context.bot.send_message(
                     chat_id=chat_id, text=custom_instructions)
 
         # send slatepack and or message from the personality
         custom_slatepack_formatting = customSlatepackFormattingMethod(update, context)
         if custom_slatepack_formatting is not None:
-                reply_text = custom_slatepack_formatting.format(
-                    {'slatepack': slatepack})
+            reply_text = custom_slatepack_formatting.format(
+                **{'slatepack': slatepack})
         else:
-                reply_text = standard_slatepack_formatting.format(
-                    {'slatepack': slatepack})
-        update.context.bot.send_message(
+            reply_text = t(standard_slatepack_formatting).format(
+                **{'slatepack': slatepack})
+        context.bot.send_message(
             chat_id=user_id, text=reply_text)
 
         # check if personality wants something sent to the user
         final_message = finalMessageMethod(update, context)
         if final_message is not None:
-            update.context.bot.send_message(
+            context.bot.send_message(
                 chat_id=user_id, text=final_message)
 
         shall_continue = False

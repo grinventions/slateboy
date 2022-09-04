@@ -253,6 +253,116 @@ class TestSlateBoy(unittest.TestCase):
         expected_response = reason
         self.assertEqual(response, expected_response)
 
+    # no instructions and standard slatepack formatting and final message
+    def testCompleteFinancialOperationCase1(self):
+        P1 = patch('slateboy.providers.WalletProvider.isReady',
+                   return_value=(True, None))
+        P2 = patch('slateboy.personality.BlankPersonality.shouldSeeEULA',
+                   return_value=(False, 'very eula', 'eula_v1'))
+        P3 = patch('slateboy.personality.BlankPersonality.canDeposit',
+                   return_value=(True, None, True, 1000))
+        slatepack = '<mr slatepack>'
+        P4 = patch('slateboy.providers.WalletProvider.invoice',
+                   return_value=(True, None, slatepack, '<txid>'))
+        P5 = patch('slateboy.personality.BlankPersonality.assignDepositTx',
+                   return_value=(True, None, None, None))
+        send_instructions = False
+        custom_instructions = None
+        P6 = patch('slateboy.personality.BlankPersonality.customDepositInstructions',
+                   return_value=(send_instructions, custom_instructions))
+        custom_slatepack_formatting = None
+        P7 = patch('slateboy.personality.BlankPersonality.customDepositSlatepackFormatting',
+                   return_value=(custom_slatepack_formatting))
+        final_message = 'Some final few words'
+        P8 = patch('slateboy.personality.BlankPersonality.customDepositFinalMessage',
+                   return_value=(final_message))
+        with P1, P2, P3, P4, P5, P6, P7, P8:
+            update = self.interact('/deposit 12.3')
+            self.mock_bot.insertUpdate(update)
+        sent = self.mock_bot.sent_messages[-2]
+        response = sent['text']
+        expected_response = t('slateboy.msg_deposit_slatepack_formatting').format(**{
+            'slatepack': slatepack
+        })
+        self.assertEqual(response, expected_response)
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+        expected_response = final_message
+        self.assertEqual(response, expected_response)
+
+    # standard instructions and custom slatepack formatting and no final message
+    def testCompleteFinancialOperationCase2(self):
+        P1 = patch('slateboy.providers.WalletProvider.isReady',
+                   return_value=(True, None))
+        P2 = patch('slateboy.personality.BlankPersonality.shouldSeeEULA',
+                   return_value=(False, 'very eula', 'eula_v1'))
+        P3 = patch('slateboy.personality.BlankPersonality.canDeposit',
+                   return_value=(True, None, True, 1000))
+        slatepack = '<mr slatepack>'
+        P4 = patch('slateboy.providers.WalletProvider.invoice',
+                   return_value=(True, None, slatepack, '<txid>'))
+        P5 = patch('slateboy.personality.BlankPersonality.assignDepositTx',
+                   return_value=(True, None, None, None))
+        send_instructions = True
+        custom_instructions = None
+        P6 = patch('slateboy.personality.BlankPersonality.customDepositInstructions',
+                   return_value=(send_instructions, custom_instructions))
+        custom_slatepack_formatting = None
+        P7 = patch('slateboy.personality.BlankPersonality.customDepositSlatepackFormatting',
+                   return_value=(custom_slatepack_formatting))
+        final_message = None
+        P8 = patch('slateboy.personality.BlankPersonality.customDepositFinalMessage',
+                   return_value=(final_message))
+        with P1, P2, P3, P4, P5, P6, P7, P8:
+            update = self.interact('/deposit 12.3')
+            self.mock_bot.insertUpdate(update)
+        sent = self.mock_bot.sent_messages[-2]
+        response = sent['text']
+        expected_response = t('slateboy.msg_deposit_instructions')
+        self.assertEqual(response, expected_response)
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+        expected_response = t('slateboy.msg_deposit_slatepack_formatting').format(**{
+            'slatepack': slatepack
+        })
+        self.assertEqual(response, expected_response)
+
+    # custom instructions and custom slatepack formatting and no final message
+    def testCompleteFinancialOperationCase3(self):
+        P1 = patch('slateboy.providers.WalletProvider.isReady',
+                   return_value=(True, None))
+        P2 = patch('slateboy.personality.BlankPersonality.shouldSeeEULA',
+                   return_value=(False, 'very eula', 'eula_v1'))
+        P3 = patch('slateboy.personality.BlankPersonality.canDeposit',
+                   return_value=(True, None, True, 1000))
+        slatepack = '<mr slatepack>'
+        P4 = patch('slateboy.providers.WalletProvider.invoice',
+                   return_value=(True, None, slatepack, '<txid>'))
+        P5 = patch('slateboy.personality.BlankPersonality.assignDepositTx',
+                   return_value=(True, None, None, None))
+        send_instructions = True
+        custom_instructions = 'custom instructions'
+        P6 = patch('slateboy.personality.BlankPersonality.customDepositInstructions',
+                   return_value=(send_instructions, custom_instructions))
+        custom_slatepack_formatting = None
+        P7 = patch('slateboy.personality.BlankPersonality.customDepositSlatepackFormatting',
+                   return_value=(custom_slatepack_formatting))
+        final_message = None
+        P8 = patch('slateboy.personality.BlankPersonality.customDepositFinalMessage',
+                   return_value=(final_message))
+        with P1, P2, P3, P4, P5, P6, P7, P8:
+            update = self.interact('/deposit 12.3')
+            self.mock_bot.insertUpdate(update)
+        sent = self.mock_bot.sent_messages[-2]
+        response = sent['text']
+        expected_response = custom_instructions
+        self.assertEqual(response, expected_response)
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+        expected_response = t('slateboy.msg_deposit_slatepack_formatting').format(**{
+            'slatepack': slatepack
+        })
+        self.assertEqual(response, expected_response)
 
     def testBalance(self):
         # no balance at all
