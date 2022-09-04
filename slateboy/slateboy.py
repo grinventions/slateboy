@@ -355,7 +355,7 @@ class SlateBoy:
 
         # check if for some reason it has failed
         if not success:
-            update.context.bot.send_message(
+            context.bot.send_message(
                 chat_id=chat_id, text=reason)
             shall_continue = False
             return shall_continue
@@ -370,7 +370,7 @@ class SlateBoy:
             self.wallet.releaseLock(tx_id)
 
             # inform the user of the failure
-            update.context.bot.send_message(
+            context.bot.send_message(
                 chat_id=chat_id, text=reason)
             shall_continue = False
             return shall_continue

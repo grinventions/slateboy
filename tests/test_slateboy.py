@@ -193,6 +193,67 @@ class TestSlateBoy(unittest.TestCase):
         self.assertEqual(response, expected_response)
 
 
+    # check if slateboy will interrupt the deposit if the wallet
+    # fails to initiate the invoice flow
+    def testDepositWalletInvoiceFlowFailure(self):
+        with patch('slateboy.providers.WalletProvider.isReady',
+                   return_value=(True, None)):
+            with patch('slateboy.personality.BlankPersonality.shouldSeeEULA',
+                   return_value=(False, 'very eula', 'eula_v1')):
+                success = True
+                unknown_reason = None
+                can_deposit = True
+                approved_amount = 1000
+                with patch('slateboy.personality.BlankPersonality.canDeposit',
+                        return_value=(success, unknown_reason, can_deposit, approved_amount)):
+                    success = False
+                    reason = 'wallet not workin :/'
+                    slatepack = None
+                    tx_id = None
+                    with patch('slateboy.providers.WalletProvider.invoice',
+                          return_value=(success, reason, slatepack, tx_id)):
+                        update = self.interact('/deposit 12.3')
+                        self.mock_bot.insertUpdate(update)
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+        expected_response = reason
+        self.assertEqual(response, expected_response)
+
+
+    # check if slateboy will interrupt the deposit if the wallet
+    # wallet succeeds but the personality fails to register the tx
+    def testDepositPersonalityFlowFailure(self):
+        with patch('slateboy.providers.WalletProvider.isReady',
+                   return_value=(True, None)):
+            with patch('slateboy.personality.BlankPersonality.shouldSeeEULA',
+                   return_value=(False, 'very eula', 'eula_v1')):
+                success = True
+                unknown_reason = None
+                can_deposit = True
+                approved_amount = 1000
+                with patch('slateboy.personality.BlankPersonality.canDeposit',
+                        return_value=(success, unknown_reason, can_deposit, approved_amount)):
+                    success = True
+                    reason = None
+                    slatepack = '<mr slatepack>'
+                    tx_id = '<txid>'
+                    with patch('slateboy.providers.WalletProvider.invoice',
+                          return_value=(success, reason, slatepack, tx_id)):
+                        success = False
+                        reason = 'dunno something ricked'
+                        send_instructions = 'None'
+                        msg = None
+                        with patch('slateboy.personality.BlankPersonality.assignDepositTx',
+                                   return_value=(success, reason, send_instructions, msg)):
+                            with patch('slateboy.providers.WalletProvider.releaseLock'):
+                                update = self.interact('/deposit 12.3')
+                                self.mock_bot.insertUpdate(update)
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+        expected_response = reason
+        self.assertEqual(response, expected_response)
+
+
     def testBalance(self):
         # no balance at all
         success, reason, balance = True, None, (0.0, 0.0, 0.0, 0.0)
@@ -235,56 +296,3 @@ class TestSlateBoy(unittest.TestCase):
             'Awaiting finalization: 3.0\n' \
             'Locked: 2.0'
         self.assertEqual(response, expected_response)
-
-
-    def testWithdraw(self):
-        # user checks balance, there is some spendable balance
-        # user tries withdrawal, requests too much and fails
-        # user checks balance, there is some spendable balance
-        # user tries withdrawal, requests less than the balance receives slatepack
-        # user checks balance, there is some spendable and locked balance
-        # user responds with the slatepack
-        # user checks balance, there is some spendable and locked balance
-        pass
-
-    # we need to introduce variations of the withdraw test:
-    # - withdraw with 'max' instead of the amount
-    # - withdraw without specifying the amount, should work as 'max'
-
-
-    def testDepositConfirmed(self):
-        # user checks balance, there amount pending confirmation
-        # bot finds that the tx_id is confirmed
-        # user gets notified
-        # user checks balance, there amount is now spendable
-        pass
-
-
-    def testDepositCanceled(self):
-        # user checks balance, there amount pending finalization
-        # bot finds that the tx_id is old and cancels it
-        # user gets notified
-        # user checks balance, there nothing
-        pass
-
-
-    def testWithdrawConfirmed(self):
-        # user checks balance, there is some spendable and locked balance
-        # bot finds that the tx_id is confirmed
-        # user gets notified
-        # user checks balance, there is only spendable balance now
-        pass
-
-
-    def testWithdrawCanceled(self):
-        # user checks balance, there amount locked
-        #user did not respond with slatepack
-
-        # bot finds that the tx_id is old and cancels it
-        # user gets notified
-        # user checks balance, the locked amount is back in spendable
-        pass
-
-    def testWalletSyncs(self):
-        # test if wallet sync method gets called
-        pass

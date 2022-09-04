@@ -1,5 +1,8 @@
 {
     "en": {
-        "msg_balance": "Spendable: {spendable}\nAwaiting confirmation: {awaiting_confirmation}\nAwaiting finalization: {awaiting_finalization}\nLocked: {locked}"
+        "msg_balance": "Spendable: {spendable}\nAwaiting confirmation: {awaiting_confirmation}\nAwaiting finalization: {awaiting_finalization}\nLocked: {locked}",
+        "msg_deposit_ignored_unknown": "Unfortunately your deposit request could not be processed",
+        "msg_deposit_rejected_unknown": "Your deposit request has been rejected without providing the reason.",
+        "msg_deposit_rejected_known": "The requested amount of {0} GRIN was not approved. The approved amount is {1}."
     }
 }
