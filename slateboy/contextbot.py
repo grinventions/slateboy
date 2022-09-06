@@ -8,8 +8,17 @@ from slateboy.personality import BlankPersonality
 # which can be made persistent if needed
 class ContextBlankPersonality(BlankPersonality):
     def __init__(self, slateboy, namespace,
-                 admins=[], EULA_key='', EULA_version=''):
+                 config={}, admins=[], EULA_key='', EULA_version=''):
         self.parent.__init__(self, slateboy)
+
+        # save the config
+        self.config = config
+
+        # custom jobs
+        first_interval = self.config.get('accounting_first_interval', 60*10)
+        frequency = self.config.get('accounting_frequency', 60*10)
+        self.custom_jobs += [
+            (first_interval, frequency, self.accountingJob)]
 
         # namespace key for the user and bot session
         self.namespace = namespace
@@ -67,12 +76,17 @@ class ContextBlankPersonality(BlankPersonality):
             reason = t('slateboy.msg_user_context_already_initiated')
             return success, reason
 
+        now = getNow()
+
         # spendable, confirming, locked
         _default_balance = (0, 0, 0, 0)
 
         context.user_data[self.namespace][user_id]['balance'] = _default_balance
         context.user_data[self.namespace][user_id]['txs'] = []
         context.user_data[self.namespace][user_id]['EULA'] = None
+        context.user_data[self.namespace][user_id]['tick'] = 0
+        context.user_data[self.namespace][user_id]['warned'] = False
+        context.user_data[self.namespace][user_id]['period'] = now
 
         # done
         success = True
@@ -111,6 +125,7 @@ class ContextBlankPersonality(BlankPersonality):
 
         context.bot_data[self.namespace]['balance'] = 0
         context.bot_data[self.namespace]['txs'] = {}
+        context.bot_data[self.namespace]['charged'] = 0
 
         # done
         success = True
@@ -170,8 +185,86 @@ class ContextBlankPersonality(BlankPersonality):
         return True
 
     #
+    # custom job
+    #
+
+    def accountingJob(self, context):
+        accounting_max_free_balance = self.config.get('max_free_balance', 10.0)
+        accounting_balance_storage_fee = self.config.get('balance_storage_fee', 10.0)
+
+        accounting_period = self.config.get('period', 2629800)
+        accounting_period_warning = self.config.get('period_warning', 2160000)
+        accounting_monthly_charge = self.config.get('monthly_charge', 1.0)
+        accounting_balanceless_inactivity = self.config.get('balanceless_inactivity', 3600)
+        accounting_inactivity_balance_fee = self.config.get('inactivity_balance_fee', 2592000)
+
+        now = getNow()
+
+        # check users
+        for user_id, user_data in context.dispatcher.user_data.items():
+            ts = user_data.get('tick', 0)
+            ts_period = user_data.get('period', 0)
+            warned = user_data.get('warned', False)
+            spendable, confirming, finalizing, locked = user_data.get('balance', (0, 0, 0, 0))
+            # handle billing for custodian services
+            if spendable > accounting_max_free_balance:
+                if accounting_period_warning < now - ts_period < accounting_monthly_charge:
+                    if not warned:
+                        reply_text = t('contextbot.msg_free_balance_warning').format(
+                            str(spendable),
+                            str(confirming),
+                            str(finalizing),
+                            str(locked),
+                            str(accounting_max_free_balance))
+                        context.bot.send_message(
+                            chat_id=user_id,
+                            text=reply_text)
+                        context.dispatcher.user_data[user_id]['warned'] = True
+                elif accounting_monthly_charge <= now - ts_period:
+                    fee = accounting_monthly_charge
+                    reply_text = t('contextbot.msg_free_balance_exceeded').format(
+                            str(spendable),
+                            str(confirming),
+                            str(finalizing),
+                            str(locked),
+                            str(accounting_max_free_balance))
+                    context.bot.send_message(
+                        chat_id=user_id,
+                        text=reply_text)
+                    context.dispatcher.user_data[user_id][self.namespace]['warned'] = False
+                    context.dispatcher.user_data[user_id][self.namespace]['period'] = now
+                    context.dispatcher.user_data[user_id][self.namespace]['balance'] = spendable - fee, confirming, finalizing, locked
+                    context.bot.bot_data[self.namespace]['charged'] += fee
+
+            # handle inactive users with no balance
+            # destroy their context to save memory
+            txs = user_data.get('txs', [])
+            no_spendable = spendable == 0
+            no_confirming = confirming == 0
+            no_finalizing = finalizing == 0
+            no_locked = locked == 0
+            no_txs = len(txs) == 0
+            if no_spendable and no_confirming and no_finalizing and no_locked and no_txs:
+                if accounting_balanceless_inactivity <= now - ts:
+                    del context.dispatcher.user_data[user_id]
+
+            accounting_balance_storage_fee
+            if accounting_inactivity_balance_fee <= now - ts:
+                fee = min(accounting_balance_storage_fee, spendable)
+                context.dispatcher.user_data[user_id][self.namespace]['balance'] = spendable - fee, confirming, finalizing, locked
+                context.dispatcher.user_data[user_id][self.namespace]['tick'] = now
+                context.bot.bot_data[self.namespace]['charged'] += fee
+
+
+
+    #
     # bot interface methods
     #
+
+    def tick(self, update, context):
+        now = update.message.date
+        context.user_data[self.namespace][user_id]['tick'] = now
+
 
     # getting the balance
     def getBalance(self, update, context):

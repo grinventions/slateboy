@@ -1,4 +1,7 @@
 class BlankPersonality:
+    def tick(self, update, context):
+        pass
+
     # getting the balance
     # returns one of the following types
     #
