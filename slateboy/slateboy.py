@@ -405,7 +405,7 @@ class SlateBoy:
         # personality can provide already formatted message ready
         # for the user
         if isinstance(balance, str):
-            update.context.bot.send_message(
+            context.bot.send_message(
                 chat_id=chat_id, text=balance)
             shall_continue = False
             return shall_continue
@@ -436,30 +436,46 @@ class SlateBoy:
         contains_slatepack, slatepack = self.containsSlatepack(update.message.text)
 
         # let the personality process the message
-        shall_continue = self.personality.incomingText(
+        shall_continue, reason = self.personality.incomingText(
             update, context, contains_slatepack)
         if not shall_continue:
+            if reason is not None:
+                context.bot.send_message(
+                    chat_id=chat_id, text=reason)
             return shall_continue
 
         # is it a group message?
         is_group_message = update.message.chat.type != 'private'
         if is_group_message:
-            shall_continue = self.personality.incomingTextGroup(
+            shall_continue, reason = self.personality.incomingTextGroup(
                 update, context, contains_slatepack)
             if not shall_continue:
+                if reason is not None:
+                    context.bot.send_message(
+                        chat_id=chat_id, text=reason)
                 return shall_continue
 
         # is it a DM?
         is_direct_message = update.message.chat.type == 'private'
         if is_direct_message:
-            shall_continue = self.personality.incomingTextDM(
+            shall_continue, reason = self.personality.incomingTextDM(
                 update, context, contains_slatepack)
             if not shall_continue:
+                if reason is not None:
+                    context.bot.send_message(
+                        chat_id=chat_id, text=reason)
                 return shall_continue
 
         # for direct messages with a slatepack we proceed with the flow
-        if not (is_direct_message and contains_slatepack):
-            return None
+        if (not is_direct_message) and contains_slatepack:
+            custom_public_slatepack_warning = self.personality.customPublicSlatepackWarning()
+            if custom_public_slatepack_warning is not None:
+                context.bot.send_message(
+                    reply_to_message_id=message_id,
+                    chat_id=chat_id,
+                    text=custom_public_slatepack_warning)
+            shall_continue = False
+            return shall_continue
 
         # looks like it is direct message with a slatepack
         slate = self.wallet.decodeSlatepack(slatepack)
@@ -595,7 +611,7 @@ class SlateBoy:
         slatepack = None
         if matches is not None:
             contains_slatepack = True
-            slatepack = matches.group(0)
+            slatepack = matches.group(0).replace('\n', '')
         return contains_slatepack, slatepack
 
     def validateFinancialOperation(

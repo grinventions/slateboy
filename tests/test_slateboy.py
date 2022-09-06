@@ -27,6 +27,14 @@ i18config.set('locale', 'en')
 resource_loader.init_json_loader()
 
 
+example_slatepack = '''
+BEGINSLATEPACK. 4H1qx1wHe668tFW yC2gfL8PPd8kSgv
+pcXQhyRkHbyKHZg GN75o7uWoT3dkib R2tj1fFGN2FoRLY
+GWmtgsneoXf7N4D uVWuyZSamPhfF1u AHRaYWvhF7jQvKx
+wNJAc7qmVm9JVcm NJLEw4k5BU7jY6S eb. ENDSLATEPACK
+'''
+
+
 class TestSlateBoy(unittest.TestCase):
     def setUp(self):
         # ignore TelegramDeprecationWarning
@@ -39,6 +47,7 @@ class TestSlateBoy(unittest.TestCase):
         self.cqg = CallbackQueryGenerator(self.mock_bot)
         # actors and chats
         self.chat = self.cg.get_chat()
+        self.group = self.cg.get_chat(type='group')
         self.alice = self.ug.get_user()
         # message generator and updater (for use with the bot.)
         self.mg = MessageGenerator(self.mock_bot)
@@ -56,12 +65,15 @@ class TestSlateBoy(unittest.TestCase):
         self.slateboy.stop()
 
 
-    def interact(self, message, expected=None):
+    def interact(self, message, group=False):
+        w = self.chat
+        if group:
+            w = self.group
         update = self.mg.get_message(
             text=message,
             parse_mode='HTML',
             user=self.alice,
-            chat=self.chat)
+            chat=w)
         return update
 
 
@@ -406,3 +418,135 @@ class TestSlateBoy(unittest.TestCase):
             'Awaiting finalization: 3.0\n' \
             'Locked: 2.0'
         self.assertEqual(response, expected_response)
+
+    def test_contains_slatepack(self):
+        some_message = '''
+        and then I tell him bla bla bla
+        '''
+        some_message += example_slatepack + '\n'
+        some_message += '''
+        and lol bro lmao xD
+        '''
+        contains_slatepack, extracted_slatepack = self.slateboy.containsSlatepack(
+            some_message)
+        expected_slatepack = example_slatepack.replace('\n', '')
+        self.assertTrue(contains_slatepack)
+        self.assertEqual(extracted_slatepack, expected_slatepack)
+
+        some_message = 'ho ho ho merry christmas!'
+        contains_slatepack, extracted_slatepack = self.slateboy.containsSlatepack(
+            some_message)
+        self.assertFalse(contains_slatepack)
+        self.assertEqual(extracted_slatepack, None)
+
+    # message is ordered to be ignored by the personality
+    def test_text_message_case1(self):
+        some_message = 'you ***********'
+
+        ignore = False
+        P1 = patch('slateboy.personality.BlankPersonality.shouldIgnore',
+                return_value=(ignore, None))
+
+        shall_continue = False
+        reason = 'because not!'
+        P2 = patch('slateboy.personality.BlankPersonality.incomingText',
+                return_value=(shall_continue, reason))
+
+        with P1, P2:
+            update = self.interact(some_message)
+            print()
+            print(update)
+            self.mock_bot.insertUpdate(update)
+
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+
+        self.assertEqual(response, reason)
+
+    # message is ordered to be ignored by the personality because it is a group
+    # message
+    def test_text_message_case2(self):
+        some_message = 'you ***********'
+
+        ignore = False
+        P1 = patch('slateboy.personality.BlankPersonality.shouldIgnore',
+                return_value=(ignore, None))
+
+        P2 = patch('slateboy.personality.BlankPersonality.incomingText',
+                return_value=(True, None))
+
+        shall_continue = False
+        reason = 'because not!'
+        P3 = patch('slateboy.personality.BlankPersonality.incomingTextGroup',
+                return_value=(shall_continue, reason))
+
+        with P1, P2, P3:
+            update = self.interact(some_message, group=True)
+            print()
+            print(update)
+            self.mock_bot.insertUpdate(update)
+
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+
+        self.assertEqual(response, reason)
+
+    # message is ordered to be ignored by the personality for a specific case
+    # of a direct message
+    def test_text_message_case3(self):
+        some_message = 'you ***********'
+
+        ignore = False
+        P1 = patch('slateboy.personality.BlankPersonality.shouldIgnore',
+                return_value=(ignore, None))
+
+        P2 = patch('slateboy.personality.BlankPersonality.incomingText',
+                return_value=(True, None))
+
+        shall_continue = False
+        reason = 'because not!'
+        P3 = patch('slateboy.personality.BlankPersonality.incomingTextDM',
+                return_value=(shall_continue, reason))
+
+        with P1, P2, P3:
+            update = self.interact(some_message, group=False)
+            print()
+            print(update)
+            self.mock_bot.insertUpdate(update)
+
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+
+        self.assertEqual(response, reason)
+
+    # group message with a slatepack should be ignored
+    def test_text_message_case4(self):
+        some_message = example_slatepack
+
+        ignore = False
+        P1 = patch('slateboy.personality.BlankPersonality.shouldIgnore',
+                return_value=(ignore, None))
+
+        P2 = patch('slateboy.personality.BlankPersonality.incomingText',
+                return_value=(True, None))
+
+        P3 = patch('slateboy.personality.BlankPersonality.incomingTextGroup',
+                return_value=(True, None))
+
+        custom_public_slatepack_warning = 'pls don do that!'
+        P4 = patch('slateboy.personality.BlankPersonality.customPublicSlatepackWarning',
+                return_value=custom_public_slatepack_warning)
+
+        with P1, P2, P3, P4:
+            update = self.interact(some_message, group=True)
+            print()
+            print(update)
+            self.mock_bot.insertUpdate(update)
+
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+
+        self.assertEqual(response, custom_public_slatepack_warning)
+
+
+

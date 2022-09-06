@@ -128,13 +128,19 @@ class BlankPersonality:
     # even if contains slatepack preventing users
     # to do deposits and withdrawals!
     def incomingText(self, update, context, contains_slatepack: bool):
-        return True
+        shall_continue = True
+        reason = False
+        return shall_continue, reason
 
     def incomingTextDM(self, update, context, contains_slatepack: bool):
-        return True
+        shall_continue = True
+        reason = False
+        return shall_continue, reason
 
     def incomingTextGroup(self, update, context, contains_slatepack: bool):
-        return True
+        shall_continue = True
+        reason = False
+        return shall_continue, reason
 
     # bot messages in the pipeline
     def customDepositInstructions(self, update, context):
@@ -162,6 +168,10 @@ class BlankPersonality:
     def customWithdrawFinalMessage(self, update, context):
         custom_final_message = None
         return custom_final_message
+
+    def customPublicSlatepackWarning(self, update, context):
+        custom_public_slatepack_warning = None
+        return custom_public_slatepack_warning
 
     # renaming standard commands
     def renameStandardCommands(self):
