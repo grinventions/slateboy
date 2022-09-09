@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/grinventions/slateboy.svg?branch=main)](https://travis-ci.com/grinventions/slateboy)
+
 # Slateboy the Slatepack Bot
 
 The idea started as [GRIN tipping bot](https://forum.grin.mw/t/grin-bounty-suggestions/9866/2) and was funded with a bounty from the GRIN Community Council. While [working](https://forum.grin.mw/t/telegram-bot-progress-thread-by-renzokuken/9882/32) on this project several designes were considered. Eventually during the [meeting in Warsaw](https://forum.grin.mw/t/grin-sun-in-warsaw-gathering/9953/2) we realized we need more than just a tipping bot, this is when this idea became more than just a bot implementation but rather a framework for building GRIN bots with various functionalities.
