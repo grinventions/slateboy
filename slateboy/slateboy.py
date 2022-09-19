@@ -501,7 +501,7 @@ class SlateBoy:
             # at this stage we have no logic for such a scenario,
             # inform the user we ignore it
             reply_text = t('slateboy.msg_ignoring_invoices')
-            return update.context.bot.send_message(
+            return context.bot.send_message(
                         chat_id=chat_id, text=reply_text,
                         reply_to_message_id=message_id)
 

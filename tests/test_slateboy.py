@@ -69,6 +69,11 @@ example_slate_s2 = {
     ]
 }
 
+example_slate_i1 = {
+    'ver': '4:3',
+    'id': '0436430c-2b02-624c-2032-570501212b00',
+    'sta': 'I1'
+}
 
 
 class TestSlateBoy(unittest.TestCase):
@@ -660,4 +665,35 @@ class TestSlateBoy(unittest.TestCase):
         response = sent['text']
 
         expected_reply_text = reply_text
+        self.assertEqual(response, expected_reply_text)
+
+    # a DM message containing an unexpected receipt
+    def test_text_message_unexpected_receipt(self):
+
+        some_message = example_slatepack
+
+        ignore = False
+        P1 = patch('slateboy.personality.BlankPersonality.shouldIgnore',
+                return_value=(ignore, None))
+
+        P2 = patch('slateboy.personality.BlankPersonality.incomingText',
+                return_value=(True, None))
+
+        P3 = patch('slateboy.personality.BlankPersonality.incomingTextGroup',
+                return_value=(False, None))
+
+        slate = example_slate_i1
+        P4 = patch('slateboy.providers.WalletProvider.decodeSlatepack',
+                return_value=slate)
+
+        with P1, P2, P3, P4:
+            update = self.interact(some_message)
+            print()
+            print(update)
+            self.mock_bot.insertUpdate(update)
+
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+
+        expected_reply_text = t('slateboy.msg_ignoring_invoices')
         self.assertEqual(response, expected_reply_text)
