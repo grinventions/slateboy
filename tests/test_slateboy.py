@@ -49,6 +49,26 @@ example_slate_s1 = {
     ]
 }
 
+example_slate_s2 = {
+    'ver': '4:3',
+    'id': '0436430c-2b02-624c-2032-570501212b00',
+    'sta': 'S2',
+    'off': 'a4052c9200000001a6052c9200000002ed564fab50b75fc5ea32ce052fc9bebf',
+    'sigs': [
+        {
+            'xs': '03b0d73a044f1f9ae06cf96ef91593f121864b66bf7f7e7ac481b0ce61e39847fe',
+            'nonce': '031b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f',
+            'part': '8f07ddd5e9f5179cff19486034181ed76505baaad53e5d994064127b56c5841b54735cb9ed2f59fb457144f7b1c8226d08b54cbdd0eb7e6492950751b0bb54f9'
+        }
+    ],
+    'coms': [
+        {
+            'c': '091582c92b99943b57955e52b5ccf1223780c2a2e55995c00c86fca2bcb46b6b9f',
+            'p': '49972a8d5b7c088e7813c3988ebe0982f8f0b12b849b1788df7da07b549408b0d6c99f80c0e2335370c104225ef5d282d79966e9044c959bedc3be03af6246fa07fc13eb3c60c90213c9f3a7a5ecf9a34c8fbaddc1a72e49e12dba9495e5aaa53bb6ac6ed63d8774707c57ab604d6bdc46de18da57a731fe336c3ccef92b4dae967417ffdae2c7d75864d46d30e287dd9cc15882e15f296b9bab0040e4432f4024be33924f112dd26c90cc800ac09a327b0ac3a661f63da9945fb1bcc82a7777d61d97cbe657675e22d035d2cf9ea03a89cfa410960ebc18a0a18b1909f4c5bef20b0fd13ffcf5a818ad8768d354b1c0f2e9b16dd7a9cf0641546f57d1945a98b8684d067dd085b90b40457e4c14665fb1b94feecf30a90f508ded16ba1bba8080a6866dffd0b1f01738fff8c62ce5e38e677835752a1b4072124dd9ff14ba8ff92126baebbb5f6e14fbb052f5d5b09aec11bfd880d7d4640a295aa83f184034d26f00cbdbabf9b89fddd7a7c9cc8c5d4b53fc39971e4495a8d984ac9607be89780fde528ee3f2d6b912908b4caf04f5c93f64431517af6b32d0b9c18255959f6903c6696ec71f615a0c877630a2d871f3f8a107fc80f306a94b6ad5790070f7d2535163bad7feae9263a9d3558ea1acecc4e61ff4e05b0162f6aba1a3b299ff1c3bb85e4109e550ad870c328bedc45fed8b504f679bc3c1a25b2b65ede44602f21fac123ba7c5f132e7c786bf9420a27bae4d2559cf7779e77f96b747b6d3ad5c13b5e8c9b49a7083001b2f98bcf242d4644537bb5a3b5b41764812a93395b7ab372c18be575e02c3763b4170234e5fddeb43420aadb71cb80f75cc681c1e7ffee3e6a8868c6076fd1da539ab9a12fef1c8cbe271b6de60100c9f82d826dc97b47b57ee9804e60112f556c1dce4f12ecc91ef34d69090b8c9d2ae9cbae38994a955cb'
+        }
+    ]
+}
+
 
 
 class TestSlateBoy(unittest.TestCase):
@@ -590,6 +610,45 @@ class TestSlateBoy(unittest.TestCase):
 
         P5 = patch('slateboy.slateboy.SlateBoy.processS1Slatepack',
                 mockedProcessS1Slatepack)
+
+        with P1, P2, P3, P4, P5:
+            update = self.interact(some_message)
+            print()
+            print(update)
+            self.mock_bot.insertUpdate(update)
+
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+
+        expected_reply_text = reply_text
+        self.assertEqual(response, expected_reply_text)
+
+    # a DM message containing a slatepack response for the withdrawal
+    def test_text_message_deposit(self):
+
+        some_message = example_slatepack
+
+        ignore = False
+        P1 = patch('slateboy.personality.BlankPersonality.shouldIgnore',
+                return_value=(ignore, None))
+
+        P2 = patch('slateboy.personality.BlankPersonality.incomingText',
+                return_value=(True, None))
+
+        P3 = patch('slateboy.personality.BlankPersonality.incomingTextGroup',
+                return_value=(False, None))
+
+        slate = example_slate_s2
+        P4 = patch('slateboy.providers.WalletProvider.decodeSlatepack',
+                return_value=slate)
+
+        reply_text = 'cowabangaaaa'
+        def mockedProcessS2Slatepack(_self, update, context, slatepack, tx_id):
+            chat_id = update.message.chat.id
+            context.bot.send_message(chat_id=chat_id, text=reply_text)
+
+        P5 = patch('slateboy.slateboy.SlateBoy.processS2Slatepack',
+                mockedProcessS2Slatepack)
 
         with P1, P2, P3, P4, P5:
             update = self.interact(some_message)
