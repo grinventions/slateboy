@@ -34,6 +34,22 @@ GWmtgsneoXf7N4D uVWuyZSamPhfF1u AHRaYWvhF7jQvKx
 wNJAc7qmVm9JVcm NJLEw4k5BU7jY6S eb. ENDSLATEPACK
 '''
 
+example_slate_s1 = {
+    'ver': '4:2',
+    'id': '0436430c-2b02-624c-2032-570501212b00',
+    'sta': 'S1',
+    'off': 'd202964900000000d302964900000000d402964900000000d502964900000000',
+    'amt': '6000000000',
+    'fee': '8000000',
+    'sigs': [
+        {
+            'xs': '023878ce845727f3a4ec76ca3f3db4b38a2d05d636b8c3632108b857fed63c96de',
+            'nonce': '031b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f',
+        }
+    ]
+}
+
+
 
 class TestSlateBoy(unittest.TestCase):
     def setUp(self):
@@ -547,6 +563,48 @@ class TestSlateBoy(unittest.TestCase):
         response = sent['text']
 
         self.assertEqual(response, custom_public_slatepack_warning)
+
+    # a DM message containing a slatepack that is a deposit
+    def test_text_message_deposit(self):
+
+        some_message = example_slatepack
+
+        ignore = False
+        P1 = patch('slateboy.personality.BlankPersonality.shouldIgnore',
+                return_value=(ignore, None))
+
+        P2 = patch('slateboy.personality.BlankPersonality.incomingText',
+                return_value=(True, None))
+
+        P3 = patch('slateboy.personality.BlankPersonality.incomingTextGroup',
+                return_value=(False, None))
+
+        slate = example_slate_s1
+        P4 = patch('slateboy.providers.WalletProvider.decodeSlatepack',
+                return_value=slate)
+
+        reply_text = 'cowabangaaaa'
+        def mockedProcessS1Slatepack(_self, update, context, slatepack, tx_id):
+            chat_id = update.message.chat.id
+            context.bot.send_message(chat_id=chat_id, text=reply_text)
+
+        P5 = patch('slateboy.slateboy.SlateBoy.processS1Slatepack',
+                mockedProcessS1Slatepack)
+
+        with P1, P2, P3, P4, P5:
+            update = self.interact(some_message)
+            print()
+            print(update)
+            self.mock_bot.insertUpdate(update)
+
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+
+        expected_reply_text = reply_text
+        self.assertEqual(response, expected_reply_text)
+
+
+
 
 
 
