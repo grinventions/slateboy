@@ -624,7 +624,7 @@ class TestSlateBoy(unittest.TestCase):
         self.assertEqual(response, expected_reply_text)
 
     # a DM message containing a slatepack response for the withdrawal
-    def test_text_message_deposit(self):
+    def test_text_message_withdrawal(self):
 
         some_message = example_slatepack
 
@@ -661,9 +661,3 @@ class TestSlateBoy(unittest.TestCase):
 
         expected_reply_text = reply_text
         self.assertEqual(response, expected_reply_text)
-
-
-
-
-
-
