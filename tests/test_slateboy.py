@@ -75,6 +75,12 @@ example_slate_i1 = {
     'sta': 'I1'
 }
 
+example_slate_i2 = {
+    'ver': '4:3',
+    'id': '0436430c-2b02-624c-2032-570501212b00',
+    'sta': 'I2'
+}
+
 
 class TestSlateBoy(unittest.TestCase):
     def setUp(self):
@@ -696,4 +702,43 @@ class TestSlateBoy(unittest.TestCase):
         response = sent['text']
 
         expected_reply_text = t('slateboy.msg_ignoring_invoices')
+        self.assertEqual(response, expected_reply_text)
+
+    # a DM message containing a slatepack response to deposit invoice
+    def test_text_message_deposit_invoice_response(self):
+
+        some_message = example_slatepack
+
+        ignore = False
+        P1 = patch('slateboy.personality.BlankPersonality.shouldIgnore',
+                return_value=(ignore, None))
+
+        P2 = patch('slateboy.personality.BlankPersonality.incomingText',
+                return_value=(True, None))
+
+        P3 = patch('slateboy.personality.BlankPersonality.incomingTextGroup',
+                return_value=(False, None))
+
+        slate = example_slate_i2
+        P4 = patch('slateboy.providers.WalletProvider.decodeSlatepack',
+                return_value=slate)
+
+        reply_text = 'cowabangaaaa'
+        def mockedProcessI2Slatepack(_self, update, context, slatepack, tx_id):
+            chat_id = update.message.chat.id
+            context.bot.send_message(chat_id=chat_id, text=reply_text)
+
+        P5 = patch('slateboy.slateboy.SlateBoy.processI2Slatepack',
+                mockedProcessI2Slatepack)
+
+        with P1, P2, P3, P4, P5:
+            update = self.interact(some_message)
+            print()
+            print(update)
+            self.mock_bot.insertUpdate(update)
+
+        sent = self.mock_bot.sent_messages[-1]
+        response = sent['text']
+
+        expected_reply_text = reply_text
         self.assertEqual(response, expected_reply_text)
