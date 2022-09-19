@@ -742,3 +742,8 @@ class TestSlateBoy(unittest.TestCase):
 
         expected_reply_text = reply_text
         self.assertEqual(response, expected_reply_text)
+
+
+# TODO test processS1Slatepack
+# TODO test processS2Slatepack
+# TODO test processI2Slatepack
