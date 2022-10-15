@@ -744,6 +744,35 @@ class TestSlateBoy(unittest.TestCase):
         self.assertEqual(response, expected_reply_text)
 
 
-# TODO test processS1Slatepack
+    # test processS1Slatepack with invalid amount
+    def test_processS1Slatepack_invalid_amount(self):
+        update = MagicMock()
+        update.message.chat.id = 0
+        update.message.from_user.id = 0
+
+        context = MagicMock()
+        context.bot.send_message.return_value = True
+
+        tx_id = '0436430c-2b02-624c-2032-570501212b00'
+        slate = {
+            'ver': '4:3',
+            'id': tx_id,
+            'sta': 'S1'
+        }
+
+        P1 = patch('slateboy.providers.WalletProvider.isReady',
+                   return_value=(True, None))
+
+        P2 = patch('slateboy.personality.BlankPersonality.shouldSeeEULA',
+                   return_value=(False, 'very eula', 'eula_v1'))
+
+        with P1, P2:
+            self.slateboy.processS1Slatepack(update, context, slate, tx_id)
+            expected = t('slateboy.msg_invalid_slatepack')
+            context.bot.send_message.assert_called_with(chat_id=0, text=expected)
+
+
 # TODO test processS2Slatepack
 # TODO test processI2Slatepack
+# TODO test validateFinancialOperation
+# TODO test completeFinancialOperation

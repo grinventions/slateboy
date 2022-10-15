@@ -487,14 +487,14 @@ class SlateBoy:
             # the following processing function will execute
             # the logic along with the personality to ensure
             # such a deposit is approved
-            return self.processS1Slatepack(update, context, slatepack, tx_id)
+            return self.processS1Slatepack(update, context, slate, tx_id)
 
         # S2 - withdrawal flow, user responded with a slatepack
         if sta == 'S2':
             # the following processing function will execute
             # the logic along with the personality to ensure
             # such a withdrawal may continue
-            return self.processS2Slatepack(update, context, slatepack, tx_id)
+            return self.processS2Slatepack(update, context, slate, tx_id)
 
         # I1 - user sent us an invoice
         if sta == 'I1':
@@ -508,7 +508,7 @@ class SlateBoy:
         # I2 - user responded to our invoice
         if sta == 'I2':
             # complete the deposit using the invoice flow
-            return self.processI2Slatepack(update, context, slatepack, tx_id)
+            return self.processI2Slatepack(update, context, slate, tx_id)
 
 
     def jobTXs(self, context):
@@ -521,7 +521,7 @@ class SlateBoy:
 
     @checkWallet
     @checkEULA
-    def processS1Slatepack(self, update, context, slatepack, tx_id):
+    def processS1Slatepack(self, update, context, slate, tx_id):
         # get the user_id and the message_id
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id
@@ -530,7 +530,7 @@ class SlateBoy:
         requested_amount = slate.get('amt', -1)
         if requested_amount == -1:
             reply_text = t('slateboy.msg_invalid_slatepack')
-            return update.context.bot.send_message(
+            return context.bot.send_message(
                 chat_id=user_id, text=reply_text)
 
         # consult the personality if this deposit is approved
