@@ -530,8 +530,10 @@ class SlateBoy:
         requested_amount = slate.get('amt', -1)
         if requested_amount == -1:
             reply_text = t('slateboy.msg_invalid_slatepack')
-            return context.bot.send_message(
+            context.bot.send_message(
                 chat_id=user_id, text=reply_text)
+            shall_continue = False
+            return shall_continue
 
         # consult the personality if this deposit is approved
         success, reason, result, approved_amount = self.personality.canDeposit(
@@ -552,7 +554,7 @@ class SlateBoy:
 
         # check if for some reason it has failed
         if not success:
-            update.context.bot.send_message(
+            context.bot.send_message(
                 chat_id=chat_id, text=reason)
             shall_continue = False
             return shall_continue
@@ -568,7 +570,7 @@ class SlateBoy:
             self.wallet.releaseLock(tx_id)
 
             # inform the user of the failure
-            update.context.bot.send_message(
+            context.bot.send_message(
                 chat_id=chat_id, text=reason)
             shall_continue = False
             return shall_continue

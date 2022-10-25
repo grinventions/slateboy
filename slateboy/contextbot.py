@@ -314,7 +314,7 @@ class ContextBlankPersonality(BlankPersonality):
         context.user_data[self.namespace][user_id]['txs'].append(tx_id)
 
         # fetch the balance
-        success, reason, balance = getUserBalance(self, context, user_id)
+        success, reason, balance = self.getUserBalance(self, context, user_id)
         spendable, awaiting_confirmation, awaiting_finalization, locked = balance
 
         # requested a deposit, make it awaiting finalization

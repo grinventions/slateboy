@@ -176,6 +176,18 @@ class BlankPersonality:
         custom_public_slatepack_warning = None
         return custom_public_slatepack_warning
 
+    def customSRSDepositInstructions(self):
+        custom_instructions = None
+        return custom_instructions
+
+    def customSRSDepositSlatepackFormatting(self):
+        custom_formatting = None
+        return custom_formatting
+
+    def customSRSDepositFinalMessage(self):
+        custom_msg = None
+        return custom_msg
+
     # renaming standard commands
     def renameStandardCommands(self):
         return {}

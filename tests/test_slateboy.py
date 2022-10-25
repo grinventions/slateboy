@@ -771,6 +771,154 @@ class TestSlateBoy(unittest.TestCase):
             expected = t('slateboy.msg_invalid_slatepack')
             context.bot.send_message.assert_called_with(chat_id=0, text=expected)
 
+    # test processS1Slatepack with personality rejection
+    def test_processS1Slatepack_personality_rejected(self):
+        update = MagicMock()
+        update.message.chat.id = 0
+        update.message.from_user.id = 0
+
+        context = MagicMock()
+        context.bot.send_message.return_value = True
+
+        tx_id = '0436430c-2b02-624c-2032-570501212b00'
+        slate = {
+            'ver': '4:3',
+            'id': tx_id,
+            'sta': 'S1',
+            'amt': 320000
+        }
+
+        P1 = patch('slateboy.providers.WalletProvider.isReady',
+                   return_value=(True, None))
+
+        P2 = patch('slateboy.personality.BlankPersonality.shouldSeeEULA',
+                   return_value=(False, 'very eula', 'eula_v1'))
+
+        reason = 'no way Jose'
+        P3 = patch('slateboy.personality.BlankPersonality.canDeposit',
+                   return_value=(True, reason, False, 300000))
+
+        with P1, P2, P3:
+            shall_continue = self.slateboy.processS1Slatepack(update, context, slate, tx_id)
+            context.bot.send_message.assert_called_with(chat_id=0, text=reason)
+            assert shall_continue == False
+
+    # test processS1Slatepack with a wallet failure
+    def test_processS1Slatepack_wallet_failure(self):
+        update = MagicMock()
+        update.message.chat.id = 0
+        update.message.from_user.id = 0
+
+        context = MagicMock()
+        context.bot.send_message.return_value = True
+
+        tx_id = '0436430c-2b02-624c-2032-570501212b00'
+        slate = {
+            'ver': '4:3',
+            'id': tx_id,
+            'sta': 'S1',
+            'amt': 320000
+        }
+
+        P1 = patch('slateboy.providers.WalletProvider.isReady',
+                   return_value=(True, None))
+
+        P2 = patch('slateboy.personality.BlankPersonality.shouldSeeEULA',
+                   return_value=(False, 'very eula', 'eula_v1'))
+
+        P3 = patch('slateboy.personality.BlankPersonality.canDeposit',
+                   return_value=(True, None, True, 320000))
+
+        reason = 'no way Jose'
+        P4 = patch('slateboy.providers.WalletProvider.receive',
+                   return_value=(False, reason, 'slatepack', 'tx_id'))
+
+        with P1, P2, P3, P4:
+            shall_continue = self.slateboy.processS1Slatepack(update, context, slate, tx_id)
+            context.bot.send_message.assert_called_with(chat_id=0, text=reason)
+            assert shall_continue == False
+
+    # test processS1Slatepack with a personality failure to create the deposit
+    def test_processS1Slatepack_personality_deposit_failure(self):
+        update = MagicMock()
+        update.message.chat.id = 0
+        update.message.from_user.id = 0
+
+        context = MagicMock()
+        context.bot.send_message.return_value = True
+
+        tx_id = '0436430c-2b02-624c-2032-570501212b00'
+        slate = {
+            'ver': '4:3',
+            'id': tx_id,
+            'sta': 'S1',
+            'amt': 320000
+        }
+
+        P1 = patch('slateboy.providers.WalletProvider.isReady',
+                   return_value=(True, None))
+
+        P2 = patch('slateboy.personality.BlankPersonality.shouldSeeEULA',
+                   return_value=(False, 'very eula', 'eula_v1'))
+
+        P3 = patch('slateboy.personality.BlankPersonality.canDeposit',
+                   return_value=(True, None, True, 320000))
+
+        P4 = patch('slateboy.providers.WalletProvider.receive',
+                   return_value=(True, None, 'slatepack', 'tx_id'))
+
+        reason = 'no way Jose'
+        P5 = patch('slateboy.personality.BlankPersonality.assignDepositTx',
+                   return_value=(False, reason, 'instructions', 'msg'))
+
+        P6 = patch('slateboy.providers.WalletProvider.releaseLock',
+                   return_value=(True))
+
+        with P1, P2, P3, P4, P5, P6:
+            shall_continue = self.slateboy.processS1Slatepack(update, context, slate, tx_id)
+            context.bot.send_message.assert_called_with(chat_id=0, text=reason)
+            assert shall_continue == False
+
+    # test processS1Slatepack complete
+    def test_processS1Slatepack_completed(self):
+        update = MagicMock()
+        update.message.chat.id = 0
+        update.message.from_user.id = 0
+
+        context = MagicMock()
+        context.bot.send_message.return_value = True
+
+        tx_id = '0436430c-2b02-624c-2032-570501212b00'
+        slate = {
+            'ver': '4:3',
+            'id': tx_id,
+            'sta': 'S1',
+            'amt': 320000
+        }
+
+        P1 = patch('slateboy.providers.WalletProvider.isReady',
+                   return_value=(True, None))
+
+        P2 = patch('slateboy.personality.BlankPersonality.shouldSeeEULA',
+                   return_value=(False, 'very eula', 'eula_v1'))
+
+        P3 = patch('slateboy.personality.BlankPersonality.canDeposit',
+                   return_value=(True, None, True, 320000))
+
+        P4 = patch('slateboy.providers.WalletProvider.receive',
+                   return_value=(True, None, 'slatepack', 'tx_id'))
+
+        reason = 'no way Jose'
+        P5 = patch('slateboy.personality.BlankPersonality.assignDepositTx',
+                   return_value=(True, None, 'instructions', 'msg'))
+
+        P6 = patch('slateboy.slateboy.SlateBoy.completeFinancialOperation',
+                   return_value=(True))
+
+        with P1, P2, P3, P4, P5, P6:
+            shall_continue = self.slateboy.processS1Slatepack(update, context, slate, tx_id)
+            assert shall_continue
+
 
 # TODO test processS2Slatepack
 # TODO test processI2Slatepack
