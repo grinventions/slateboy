@@ -658,7 +658,10 @@ class SlateBoy:
         return shall_continue
 
     def completeFinancialOperation(
-            self, update, context, slatepack,
+            self,
+            update,
+            context,
+            slatepack,
             customInstructionsMethod,
             customSlatepackFormattingMethod,
             finalMessageMethod,

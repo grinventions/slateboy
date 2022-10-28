@@ -7,7 +7,7 @@ from i18n import config as i18config
 from i18n.translator import t
 
 # from telegram.warning import TelegramDeprecationWarning
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import patch, Mock, MagicMock, call
 
 from ptbtest import ChatGenerator
 from ptbtest import MessageGenerator
@@ -1192,4 +1192,224 @@ class TestSlateBoy(unittest.TestCase):
         context.bot.send_message.assert_not_called
         assert shall_continue == True
 
-# TODO test completeFinancialOperation
+    # not send instructions, no formatting and no final message
+    def test_completeFinancialOperation_case1(self):
+        chat_id = 0
+        user_id = 1
+
+        update = MagicMock()
+        update.message.chat.id = chat_id
+        update.message.from_user.id = user_id
+
+        context = MagicMock()
+        context.bot.send_message.return_value = True
+
+        slatepack = 'slatepack'
+        standard_instructions = 'standard_instructions'
+        standard_slatepack_formatting = 'Here is {slatepack}'
+
+        def customInstructionsMethod(update, context):
+            send_instructions = False
+            custom_instructions = None
+            return send_instructions, custom_instructions
+
+        def customSlatepackFormattingMethod(update, context):
+            custom_slatepack_formatting = None
+            return custom_slatepack_formatting
+
+        def finalMessageMethod(update, context):
+            final_message = None
+            return final_message
+
+        shall_continue = self.slateboy.completeFinancialOperation(
+            update,
+            context,
+            slatepack,
+            customInstructionsMethod,
+            customSlatepackFormattingMethod,
+            finalMessageMethod,
+            standard_instructions,
+            standard_slatepack_formatting)
+
+        expected_calls = [call(chat_id=user_id, text='Here is slatepack')]
+        context.bot.send_message.assert_has_calls(expected_calls, any_order=False)
+
+    # send instructions, no formatting and no final message
+    def test_completeFinancialOperation_case2(self):
+        chat_id = 0
+        user_id = 1
+
+        update = MagicMock()
+        update.message.chat.id = chat_id
+        update.message.from_user.id = user_id
+
+        context = MagicMock()
+        context.bot.send_message.return_value = True
+
+        slatepack = 'slatepack'
+        standard_instructions = 'standard_instructions'
+        standard_slatepack_formatting = 'Here is {slatepack}'
+
+        def customInstructionsMethod(update, context):
+            send_instructions = True
+            custom_instructions = None
+            return send_instructions, custom_instructions
+
+        def customSlatepackFormattingMethod(update, context):
+            custom_slatepack_formatting = None
+            return custom_slatepack_formatting
+
+        def finalMessageMethod(update, context):
+            final_message = None
+            return final_message
+
+        shall_continue = self.slateboy.completeFinancialOperation(
+            update,
+            context,
+            slatepack,
+            customInstructionsMethod,
+            customSlatepackFormattingMethod,
+            finalMessageMethod,
+            standard_instructions,
+            standard_slatepack_formatting)
+
+        expected_calls = [
+            call(chat_id=chat_id, text=t(standard_instructions)),
+            call(chat_id=user_id, text='Here is slatepack')]
+        context.bot.send_message.assert_has_calls(expected_calls, any_order=False)
+
+    # send custom instructions, no formatting and no final message
+    def test_completeFinancialOperation_case3(self):
+        chat_id = 0
+        user_id = 1
+
+        update = MagicMock()
+        update.message.chat.id = chat_id
+        update.message.from_user.id = user_id
+
+        context = MagicMock()
+        context.bot.send_message.return_value = True
+
+        slatepack = 'slatepack'
+        standard_instructions = 'standard_instructions'
+        standard_slatepack_formatting = 'Here is {slatepack}'
+
+        def customInstructionsMethod(update, context):
+            send_instructions = True
+            custom_instructions = 'this is how'
+            return send_instructions, custom_instructions
+
+        def customSlatepackFormattingMethod(update, context):
+            custom_slatepack_formatting = None
+            return custom_slatepack_formatting
+
+        def finalMessageMethod(update, context):
+            final_message = None
+            return final_message
+
+        shall_continue = self.slateboy.completeFinancialOperation(
+            update,
+            context,
+            slatepack,
+            customInstructionsMethod,
+            customSlatepackFormattingMethod,
+            finalMessageMethod,
+            standard_instructions,
+            standard_slatepack_formatting)
+
+        expected_calls = [
+            call(chat_id=chat_id, text='this is how'),
+            call(chat_id=user_id, text='Here is slatepack')]
+        context.bot.send_message.assert_has_calls(expected_calls, any_order=False)
+
+    # send custom instructions, with formatting and no final message
+    def test_completeFinancialOperation_case4(self):
+        chat_id = 0
+        user_id = 1
+
+        update = MagicMock()
+        update.message.chat.id = chat_id
+        update.message.from_user.id = user_id
+
+        context = MagicMock()
+        context.bot.send_message.return_value = True
+
+        slatepack = 'slatepack'
+        standard_instructions = 'standard_instructions'
+        standard_slatepack_formatting = 'Here is {slatepack}'
+
+        def customInstructionsMethod(update, context):
+            send_instructions = True
+            custom_instructions = 'this is how'
+            return send_instructions, custom_instructions
+
+        def customSlatepackFormattingMethod(update, context):
+            custom_slatepack_formatting = 'woohoo {slatepack}'
+            return custom_slatepack_formatting
+
+        def finalMessageMethod(update, context):
+            final_message = None
+            return final_message
+
+        shall_continue = self.slateboy.completeFinancialOperation(
+            update,
+            context,
+            slatepack,
+            customInstructionsMethod,
+            customSlatepackFormattingMethod,
+            finalMessageMethod,
+            standard_instructions,
+            standard_slatepack_formatting)
+
+        expected_calls = [
+            call(chat_id=chat_id, text='this is how'),
+            call(chat_id=user_id, text='woohoo slatepack')]
+        context.bot.send_message.assert_has_calls(expected_calls, any_order=False)
+
+    # send custom instructions, with formatting and with final message
+    def test_completeFinancialOperation_case5(self):
+        chat_id = 0
+        user_id = 1
+
+        update = MagicMock()
+        update.message.chat.id = chat_id
+        update.message.from_user.id = user_id
+
+        context = MagicMock()
+        context.bot.send_message.return_value = True
+
+        slatepack = 'slatepack'
+        standard_instructions = 'standard_instructions'
+        standard_slatepack_formatting = 'Here is {slatepack}'
+
+        def customInstructionsMethod(update, context):
+            send_instructions = True
+            custom_instructions = 'this is how'
+            return send_instructions, custom_instructions
+
+        def customSlatepackFormattingMethod(update, context):
+            custom_slatepack_formatting = 'woohoo {slatepack}'
+            return custom_slatepack_formatting
+
+        def finalMessageMethod(update, context):
+            final_message = 'kwisatz haderach'
+            return final_message
+
+        shall_continue = self.slateboy.completeFinancialOperation(
+            update,
+            context,
+            slatepack,
+            customInstructionsMethod,
+            customSlatepackFormattingMethod,
+            finalMessageMethod,
+            standard_instructions,
+            standard_slatepack_formatting)
+
+        expected_calls = [
+            call(chat_id=chat_id, text='this is how'),
+            call(chat_id=user_id, text='woohoo slatepack'),
+            call(chat_id=user_id, text='kwisatz haderach')]
+        context.bot.send_message.assert_has_calls(expected_calls, any_order=False)
+
+
+
