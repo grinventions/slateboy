@@ -617,8 +617,14 @@ class SlateBoy:
         return contains_slatepack, slatepack
 
     def validateFinancialOperation(
-            self, update, context, processing_success, reason_of_failure,
-            allowed, requested_amount, approved_amount, reject_reason_known, reject_reason_unknown):
+            self,
+            update,
+            context,
+            processing_success,
+            reason_of_failure,
+            allowed,
+            requested_amount,
+            approved_amount, reject_reason_known, reject_reason_unknown):
         # get the user_id and the message_id
         chat_id = update.message.chat.id
         user_id = update.message.from_user.id

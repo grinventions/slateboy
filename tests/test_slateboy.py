@@ -1080,5 +1080,116 @@ class TestSlateBoy(unittest.TestCase):
                 chat_id=user_id, text=expected)
             assert shall_continue == False
 
-# TODO test validateFinancialOperation
+    def test_validateFinancialOperation(self):
+        chat_id = 0
+        user_id = 1
+
+        update = MagicMock()
+        update.message.chat.id = chat_id
+        update.message.from_user.id = user_id
+
+        context = MagicMock()
+        context.bot.send_message.return_value = True
+
+        # not allowed and reason is requested too much
+
+        processing_success = None
+        reason_of_failure = None
+        allowed = False
+        requested_amount = 3000
+        approved_amount = 2900
+        reject_reason_known = 'You requested {0} but approved is {1}'
+        reject_reason_unknown = 'reject_reason_unknown'
+
+        shall_continue = self.slateboy.validateFinancialOperation(
+            update,
+            context,
+            processing_success,
+            reason_of_failure,
+            allowed,
+            requested_amount,
+            approved_amount,
+            reject_reason_known,
+            reject_reason_unknown)
+
+        expected = 'You requested 3000 but approved is 2900'
+        context.bot.send_message.assert_called_with(
+            chat_id=chat_id, text=expected)
+        assert shall_continue == False
+
+        # not allowed and reason is provided explicitly
+
+        processing_success = None
+        reason_of_failure = 'this is why'
+        allowed = False
+        requested_amount = 3000
+        approved_amount = 2900
+        reject_reason_known = 'You requested {0} but approved is {1}'
+        reject_reason_unknown = 'reject_reason_unknown'
+
+        shall_continue = self.slateboy.validateFinancialOperation(
+            update,
+            context,
+            processing_success,
+            reason_of_failure,
+            allowed,
+            requested_amount,
+            approved_amount,
+            reject_reason_known,
+            reject_reason_unknown)
+
+        context.bot.send_message.assert_called_with(
+            chat_id=chat_id, text=reason_of_failure)
+        assert shall_continue == False
+
+        # not allowed and nobody knows why
+
+        processing_success = None
+        reason_of_failure = None
+        allowed = False
+        requested_amount = 3000
+        approved_amount = None
+        reject_reason_known = None
+        reject_reason_unknown = 'reject_reason_unknown'
+
+        shall_continue = self.slateboy.validateFinancialOperation(
+            update,
+            context,
+            processing_success,
+            reason_of_failure,
+            allowed,
+            requested_amount,
+            approved_amount,
+            reject_reason_known,
+            reject_reason_unknown)
+
+        expected = t(reject_reason_unknown)
+        context.bot.send_message.assert_called_with(
+            chat_id=chat_id, text=expected)
+        assert shall_continue == False
+
+        # finally everything ok
+
+        processing_success = None
+        reason_of_failure = None
+        allowed = True
+        requested_amount = 3000
+        approved_amount = None
+        reject_reason_known = None
+        reject_reason_unknown = None
+
+        shall_continue = self.slateboy.validateFinancialOperation(
+            update,
+            context,
+            processing_success,
+            reason_of_failure,
+            allowed,
+            requested_amount,
+            approved_amount,
+            reject_reason_known,
+            reject_reason_unknown)
+
+        context.bot.send_message.assert_not_called
+        assert shall_continue == True
+
 # TODO test completeFinancialOperation
