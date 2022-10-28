@@ -919,8 +919,166 @@ class TestSlateBoy(unittest.TestCase):
             shall_continue = self.slateboy.processS1Slatepack(update, context, slate, tx_id)
             assert shall_continue
 
+    # shouldFinalizeQueryMethod stops it
+    def test_processSlatepack_shouldFinalizeQueryMethod(self):
+        chat_id = 0
+        user_id = 1
 
-# TODO test processS2Slatepack
-# TODO test processI2Slatepack
+        update = MagicMock()
+        update.message.chat.id = chat_id
+        update.message.from_user.id = user_id
+
+        context = MagicMock()
+        context.bot.send_message.return_value = True
+
+        reason = 'no way Jose'
+        def shouldFinalizeQueryMethod(update, context, tx_id):
+            should_finalize = False
+            return should_finalize, reason
+
+        def shouldFinalizeQueryMethodNoReason(update, context, tx_id):
+            should_finalize = False
+            return should_finalize, None
+
+        def finalizedTxMethod(update, context, tx_id):
+            success = True
+            msg = ''
+            return success, None, msg
+
+        slatepack = 'slatepack'
+        tx_id = '0436430c-2b02-624c-2032-570501212b00'
+        msg_slatepack_rejected = 'rejected'
+        msg_slatepack_finalized = 'finalized'
+
+        shall_continue = self.slateboy.processSlatepack(
+            update,
+            context,
+            slatepack,
+            tx_id,
+            shouldFinalizeQueryMethod,
+            finalizedTxMethod,
+            msg_slatepack_rejected,
+            msg_slatepack_finalized)
+
+        context.bot.send_message.assert_called_with(chat_id=user_id, text=reason)
+        assert shall_continue == False
+
+        shall_continue = self.slateboy.processSlatepack(
+            update,
+            context,
+            slatepack,
+            tx_id,
+            shouldFinalizeQueryMethodNoReason,
+            finalizedTxMethod,
+            msg_slatepack_rejected,
+            msg_slatepack_finalized)
+
+        expected = t(msg_slatepack_rejected)
+        context.bot.send_message.assert_called_with(
+            chat_id=user_id, text=expected)
+        assert shall_continue == False
+
+    # wallet stops it
+    def test_processSlatepack_finalize_fails(self):
+        chat_id = 0
+        user_id = 1
+
+        update = MagicMock()
+        update.message.chat.id = chat_id
+        update.message.from_user.id = user_id
+
+        context = MagicMock()
+        context.bot.send_message.return_value = True
+
+        def shouldFinalizeQueryMethod(update, context, tx_id):
+            should_finalize = True
+            reason = None
+            return should_finalize, reason
+
+        reason = 'no way Jose'
+        msg = 'mmomm'
+        def finalizedTxMethod(update, context, tx_id):
+            success = False
+            return success, reason, msg
+
+        def finalizedTxMethodOK(update, context, tx_id):
+            success = True
+            return success, reason, msg
+
+        def finalizedTxMethodOKMysterious(update, context, tx_id):
+            success = True
+            return success, reason, None
+
+        slatepack = 'slatepack'
+        tx_id = '0436430c-2b02-624c-2032-570501212b00'
+        msg_slatepack_rejected = 'rejected'
+        msg_slatepack_finalized = 'finalized'
+
+        wallet_reason = 'wallet ricked'
+        P1 = patch('slateboy.providers.WalletProvider.finalize',
+                   return_value=(False, wallet_reason, None))
+
+        with P1:
+            shall_continue = self.slateboy.processSlatepack(
+                update,
+                context,
+                slatepack,
+                tx_id,
+                shouldFinalizeQueryMethod,
+                finalizedTxMethod,
+                msg_slatepack_rejected,
+                msg_slatepack_finalized)
+
+            context.bot.send_message.assert_called_with(
+                chat_id=user_id, text=wallet_reason)
+            assert shall_continue == False
+
+        P2 = patch('slateboy.providers.WalletProvider.finalize',
+                   return_value=(True, None, 'response'))
+
+        with P2:
+            shall_continue = self.slateboy.processSlatepack(
+                update,
+                context,
+                slatepack,
+                tx_id,
+                shouldFinalizeQueryMethod,
+                finalizedTxMethod,
+                msg_slatepack_rejected,
+                msg_slatepack_finalized)
+
+            context.bot.send_message.assert_called_with(
+                chat_id=user_id, text=reason)
+            assert shall_continue == False
+
+            shall_continue = self.slateboy.processSlatepack(
+                update,
+                context,
+                slatepack,
+                tx_id,
+                shouldFinalizeQueryMethod,
+                finalizedTxMethodOK,
+                msg_slatepack_rejected,
+                msg_slatepack_finalized)
+
+            context.bot.send_message.assert_called_with(
+                chat_id=user_id, text=msg)
+            assert shall_continue == False
+
+            shall_continue = self.slateboy.processSlatepack(
+                update,
+                context,
+                slatepack,
+                tx_id,
+                shouldFinalizeQueryMethod,
+                finalizedTxMethodOKMysterious,
+                msg_slatepack_rejected,
+                msg_slatepack_finalized)
+
+            expected = t(msg_slatepack_finalized)
+            context.bot.send_message.assert_called_with(
+                chat_id=user_id, text=expected)
+            assert shall_continue == False
+
 # TODO test validateFinancialOperation
 # TODO test completeFinancialOperation

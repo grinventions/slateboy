@@ -643,7 +643,7 @@ class SlateBoy:
         # rejected for unknown reasons
         if not allowed:
             reply_text = t(reject_reason_unknown)
-            update.context.bot.send_message(
+            context.bot.send_message(
                 chat_id=chat_id, text=reply_text)
             shall_continue = False
             return shall_continue
@@ -706,12 +706,12 @@ class SlateBoy:
         should_finalize, reason = shouldFinalizeQueryMethod(update, context, tx_id)
         if not should_finalize:
             if reason is not None:
-                update.context.bot.send_message(
+                context.bot.send_message(
                     chat_id=user_id, text=reason)
                 shall_continue = False
                 return shall_continue
             reply_text = t(msg_slatepack_rejected)
-            update.context.bot.send_message(
+            context.bot.send_message(
                 chat_id=user_id, text=reply_text)
             shall_continue = False
             return shall_continue
@@ -722,7 +722,7 @@ class SlateBoy:
         # did it not work for some reason?
         if not success:
             # inform the user of the failure
-            update.context.bot.send_message(
+            context.bot.send_message(
                 chat_id=user_id, text=reason)
             shall_continue = False
             return shall_continue
@@ -733,18 +733,19 @@ class SlateBoy:
         # did it not work for some reason?
         if not success:
             # inform the user of the failure
-            update.context.bot.send_message(
+            context.bot.send_message(
                 chat_id=user_id, text=reason)
             shall_continue = False
             return shall_continue
 
         if msg is not None:
-            update.context.bot.send_message(
+            context.bot.send_message(
                 chat_id=user_id, text=msg)
             shall_continue = False
             return shall_continue
+
         reply_text = t(msg_slatepack_finalized)
-        update.context.bot.send_message(
+        context.bot.send_message(
                 chat_id=user_id, text=reply_text)
         shall_continue = False
         return shall_continue
