@@ -304,7 +304,7 @@ class SlateBoy:
 
         # did it not work for some reason?
         if not success:
-            # release the locked outputs
+            # release the locked outputs by cancelling the tx
             self.wallet.releaseLock(tx_id)
 
             # inform the user of the failure
