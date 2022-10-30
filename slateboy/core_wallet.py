@@ -1,8 +1,26 @@
 import functools
+import requests
 
 from grinmw.wallet_v3 import WalletV3, WalletError
 
 from src.providers import WalletProvider
+
+
+# until the following PR gets merged...
+# https://github.com/grinfans/grinmw.py/pull/7
+def receive(api_url, api_user, api_password, slate, dest_acct_name, r_addr):
+    method = ''
+    payload = {
+        'jsonrpc': '2.0',
+        'id': 1,
+        'method': 'receive_tx',
+        'params': [slate, dest_acct_name, r_addr]
+    }
+    response = requests.post(
+                api_url, json=payload,
+                auth=(api_user, api_password))
+    return resp['result']['Ok']
+
 
 class WrapCoreWallet:
     def __init__(self, expected_length):
@@ -30,10 +48,17 @@ class WrapCoreWallet:
 
 
 class CoreWallet(WalletProvider):
-    def __init__(self, api_password, api_host='http://127.0.0.1:3420/v3/owner', api_user='grin', wallet_password=''):
+    def __init__(
+            self,
+            api_password,
+            api_url='http://127.0.0.1:3420/v3/owner',
+            foreign_api_url='http://localhost:3415/v2/foreign',
+            api_user='grin', wallet_password=''):
         self.api_user = api_user
         self.api_password = api_password
-        self.api_host = api_host
+
+        self.foreign_api_url = foreign_api_url
+        self.api_url = api_url
 
         self.wallet_password = wallet_password
 
@@ -124,11 +149,11 @@ class CoreWallet(WalletProvider):
     # returns success (bool) reason (str), slatepack (str) tx_id (str)
     @WrapCoreWallet(4)
     def receive(self, slatepack):
-        # for this we need to foreign API implemented
-        # https://github.com/grinfans/grinmw.py only has owner
-        # but I already have a fork and PR with foreign API
-        # https://github.com/grinfans/grinmw.py/pull/7
-        raise Exception('Unimplemented')
+        secret_indices = [0]
+        slate = self.wallet.slate_from_slatepack_message(slatepack, secret_indices)
+        dest_acct_name = None # TODO check this argument
+        r_addr = None # TODO check this argument
+        receive(self.foreign_api_url, self.api_user, self.api_password, slate, dest_acct_name, r_addr)
 
     # returns success (bool) reason (str), slatepack (str) tx_id (str)
     @WrapCoreWallet(3)
