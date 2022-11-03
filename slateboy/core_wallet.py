@@ -3,7 +3,7 @@ import requests
 
 from grinmw.wallet_v3 import WalletV3, WalletError
 
-from src.providers import WalletProvider
+from slateboy.providers import WalletProvider
 
 
 # until the following PR gets merged...
@@ -67,6 +67,8 @@ class CoreWallet(WalletProvider):
 
     def manageConnection(self):
         self.wallet = WalletV3(self.api_url, self.api_user, self.api_password)
+        self.wallet_share_secret = self.wallet.init_secure_api()
+        self.wallet_token = self.wallet.open_wallet(None, self.wallet_password)
 
     # returns success (bool) reason (str)
     @WrapCoreWallet(2)
@@ -80,10 +82,10 @@ class CoreWallet(WalletProvider):
     @WrapCoreWallet(2)
     def isReady(self):
         ret = self.wallet.retrieve_summary_info()
-        connected = ret[0]
-        success = isinstance(connected, bool)
-        reason = None
-        return success, reason
+        if ret.get('last_confirmed_height', None) is not None:
+            return True, None
+        else:
+            return False, None
 
     # returns success (bool) reason (str) slatepack (str) tx_id (str)
     @WrapCoreWallet(4)

@@ -7,9 +7,10 @@ from slateboy.personality import BlankPersonality
 # the EULA, it stores value in the bot context
 # which can be made persistent if needed
 class ContextBlankPersonality(BlankPersonality):
-    def __init__(self, slateboy, namespace,
+    def __init__(self, namespace,
                  config={}, admins=[], EULA_key='', EULA_version=''):
-        self.parent.__init__(self, slateboy)
+        self.custom_jobs = []
+        BlankPersonality.__init__(self)
 
         # save the config
         self.config = config
@@ -28,15 +29,16 @@ class ContextBlankPersonality(BlankPersonality):
         self.validateAdmins()
 
         # EULA
-        self.EULA_key = EULA
+        self.EULA_key = EULA_key
         self.EULA_version = EULA_version
+
 
     #
     # utility methods
     #
 
     # if you have custom logic for handling admins you may override this method
-    def validateAdmins(self, admins):
+    def validateAdmins(self):
         if len(self.admins) == 0:
             raise ValueError('There needs to be at least one admin')
 
@@ -117,11 +119,13 @@ class ContextBlankPersonality(BlankPersonality):
     # initiating the user context data structure
     def initBotContext(self, context, update=None):
         # check if context initiated
-        is_initiated, _ = self.isBotContextInitiated(update, context)
+        is_initiated, _ = self.isBotContextInitiated(context)
         if is_initiated:
             success = False
             reason = t('slateboy.msg_bot_context_already_initiated')
             return success, reason
+        else:
+            context.bot_data[self.namespace] = {}
 
         context.bot_data[self.namespace]['balance'] = 0
         context.bot_data[self.namespace]['txs'] = {}
@@ -670,3 +674,9 @@ class ContextBlankPersonality(BlankPersonality):
         ignore = False
         reason = None
         return ignore, reason
+
+    def atStart(self, context):
+        success, reason = self.isBotContextInitiated(context)
+        if not success:
+            self.initBotContext(context)
+

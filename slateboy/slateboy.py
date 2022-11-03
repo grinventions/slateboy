@@ -222,6 +222,8 @@ class SlateBoy:
         self.updater.dispatcher.add_handler(
             CallbackQueryHandler(self.callbackQueryHandler))
 
+        self.updater.job_queue.run_once(self.personality.atStart, when=0)
+
     def run(self, idle=True):
         self.updater.start_polling()
         if idle:
@@ -260,7 +262,6 @@ class SlateBoy:
         reply_markup = self.personality.buttonPressed(update, context, query.data)
         query.edit_message_reply_markup(reply_markup=None)
         return False
-
 
     @checkWallet
     @checkShouldIgnore('slateboy.msg_withdraw_ignored_unknown')

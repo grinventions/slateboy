@@ -199,3 +199,6 @@ class BlankPersonality:
     # register custom jobs
     def registerCustomJobs(self):
         return []
+
+    def atStart(self, context):
+        return True
