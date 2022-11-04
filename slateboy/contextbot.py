@@ -1,6 +1,7 @@
 from i18n.translator import t
 
 from slateboy.personality import BlankPersonality
+from slateboy.helpers import getNow, extractIDs, extractIsBot
 
 
 # a bot capable only deposits, withdrawals and displaying
@@ -83,6 +84,8 @@ class ContextBlankPersonality(BlankPersonality):
         # spendable, confirming, locked
         _default_balance = (0, 0, 0, 0)
 
+        context.user_data[self.namespace] = {}
+        context.user_data[self.namespace][user_id] = {}
         context.user_data[self.namespace][user_id]['balance'] = _default_balance
         context.user_data[self.namespace][user_id]['txs'] = []
         context.user_data[self.namespace][user_id]['EULA'] = None
@@ -626,12 +629,12 @@ class ContextBlankPersonality(BlankPersonality):
         return needs_to_see, EULA, EULA_verion
 
     # we mark user has approved terms and agreement
-    def approvedEULA(self, update, context):
+    def approvedEULA(self, update, context, EULA_version):
         # get the user_id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # mark the approved EULA as the currently required one
-        context.user_data[self.namespace][user_id]['EULA'] = self.EULA_version
+        context.user_data[self.namespace][user_id]['EULA'] = EULA_version
 
         # all done!
         success = True
@@ -639,7 +642,7 @@ class ContextBlankPersonality(BlankPersonality):
         return success, reason
 
     # we do not record EULA denials, simply ignore
-    def deniedEULA(self, update, context):
+    def deniedEULA(self, update, context, EULA_version):
         # all done!
         success = True
         reason = None
@@ -664,7 +667,7 @@ class ContextBlankPersonality(BlankPersonality):
     # we want the bot to ignore other bots by default
     def shouldIgnore(self, update, context):
         # is the message coming from a bot?
-        if update.message.from_user.is_bot:
+        if extractIsBot(update):
             ignore = True
             reason = t('slateboy.msg_rejecting_bots')
             return ignore, reason
@@ -679,4 +682,8 @@ class ContextBlankPersonality(BlankPersonality):
         success, reason = self.isBotContextInitiated(context)
         if not success:
             self.initBotContext(context)
+
+    def atCommand(self, context, user_id):
+        self.initBotContext(context)
+        self.initUserContext(context, user_id)
 

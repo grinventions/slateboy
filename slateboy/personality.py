@@ -202,3 +202,6 @@ class BlankPersonality:
 
     def atStart(self, context):
         return True
+
+    def atCommand(self, context, user_id):
+        return True

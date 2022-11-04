@@ -9,8 +9,29 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from i18n.translator import t
 
+from slateboy.helpers import extractIDs
+
 
 # just bunch of wrappers to avoid repeating code
+
+
+def preCommand(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # restore the arguments
+        self = args[0]
+        update = args[1]
+        context = args[2]
+
+        # get the user_id
+        chat_id, user_id = extractIDs(update)
+
+        # pre-command callback
+        self.personality.atCommand(context, user_id)
+
+        # proceed
+        return func(*args, **kwargs)
+    return wrapper
 
 def checkWallet(func):
     @wraps(func)
@@ -81,9 +102,7 @@ class checkShouldIgnore:
             update = args[1]
             context = args[2]
 
-            # get the user_id
-            chat_id = update.message.chat.id
-            user_id = update.message.from_user.id
+            chat_id, user_id = extractIDs(update)
 
             # check if personality wishes to reject this flow
             ignore, reason = otherself.personality.shouldIgnore(update, context)
@@ -232,11 +251,12 @@ class SlateBoy:
     def stop(self):
         self.updater.stop()
 
+    @preCommand
     @checkShouldIgnore('slateboy.msg_callback_query_ignored_unknown')
     def callbackQueryHandler(self, update, context):
         # get the user_id
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        print('callbackQueryHandler')
+        chat_id, user_id = extractIDs(update)
 
         # extract the query
         query = update.callback_query
@@ -244,6 +264,7 @@ class SlateBoy:
 
         # check if user approved the EULA
         if query.data.startswith('eula-approve-'):
+            print('approve')
             EULA_version = query.data.split('eula-approve-')[1]
             reply_markup = self.personality.approvedEULA(
                 update, context, EULA_version)
@@ -252,6 +273,7 @@ class SlateBoy:
 
         # check if user denied the EULA
         if query.data.startswith('eula-deny-'):
+            print('reject')
             EULA_version = query.data.split('eula-deny-')[1]
             reply_markup = self.personality.deniedEULA(
                 update, context, EULA_version)
@@ -264,6 +286,7 @@ class SlateBoy:
         return False
 
     @checkWallet
+    @preCommand
     @checkShouldIgnore('slateboy.msg_withdraw_ignored_unknown')
     @parseRequestedAmountArgument(
         'slateboy.msg_withdraw_missing_amount',
@@ -326,6 +349,7 @@ class SlateBoy:
 
 
     @checkWallet
+    @preCommand
     @checkEULA
     @checkShouldIgnore('slateboy.msg_deposit_ignored_unknown')
     @parseRequestedAmountArgument(
@@ -387,6 +411,7 @@ class SlateBoy:
         return shall_continue
 
 
+    @preCommand
     @checkShouldIgnore('slateboy.msg_balance_ignored_unknown')
     def handlerBalance(self, update, context):
         # get the user_id
