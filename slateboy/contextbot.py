@@ -276,7 +276,7 @@ class ContextBlankPersonality(BlankPersonality):
     # getting the balance
     def getBalance(self, update, context):
         # get the user_id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # get the balance
         success, reason, balance = getUserBalance(self, context, user_id)
@@ -291,7 +291,7 @@ class ContextBlankPersonality(BlankPersonality):
     # by default we just accept all the deposits
     def canDeposit(self, update, context, amount):
         # get the user_id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # make sure user does have a valid context
         # if not, simply create it
@@ -307,7 +307,7 @@ class ContextBlankPersonality(BlankPersonality):
 
     def assignDepositTx(self, update, context, amount, tx_id):
         # get the user_id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # check if this transaction has already been assigned
         if tx_id in context.bot_data[self.namespace]['txs'].keys():
@@ -341,7 +341,7 @@ class ContextBlankPersonality(BlankPersonality):
 
     def finalizeDepositTx(self, update, context, amount, tx_id):
         # get the user_id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # validate this tx for given user
         self.isTxValid(context, user_id, tx_id)
@@ -433,8 +433,7 @@ class ContextBlankPersonality(BlankPersonality):
 
     # withdraw behavior
     def canWithdraw(self, update, context, requested_amount, maximum=False):
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         is_initiated, reason = self.isUserContextInitiated(context, user_id)
         if not is_initiated:
@@ -470,7 +469,7 @@ class ContextBlankPersonality(BlankPersonality):
 
     def assignWithdrawTx(self, update, context, amount, tx_id):
         # get the user_id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # check if this transaction has already been assigned
         if tx_id in context.bot_data[self.namespace]['txs'].keys():
@@ -502,7 +501,7 @@ class ContextBlankPersonality(BlankPersonality):
 
     def finalizeWithdrawTx(self, update, context, amount, tx_id):
         # get the user_id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # validate this tx for given user
         self.isTxValid(context, user_id, tx_id)
@@ -604,7 +603,7 @@ class ContextBlankPersonality(BlankPersonality):
     # whether user has to see the terms and agreements
     def shouldSeeEULA(self, update, context):
         # get the user_id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # check most recent EULA signed by the user
         signed_version = context.user_data[self.namespace][user_id]['EULA']
@@ -654,7 +653,7 @@ class ContextBlankPersonality(BlankPersonality):
     # if not, bot will leave immediately
     def shouldLeave(self, update, context):
         # get the user_id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # bot will leave the group if added by a stranger
         if user_id not in self.admins:

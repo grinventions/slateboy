@@ -42,8 +42,7 @@ def checkWallet(func):
         context = args[2]
 
         # get the user_id
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # check if wallet is operational
         is_wallet_ready, reason = self.wallet.isReady()
@@ -63,8 +62,7 @@ def checkEULA(func):
         context = args[2]
 
         # get the user_id
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # check if the personality wishes this user to see the EULA
         needs_to_see, EULA, EULA_verion = self.personality.shouldSeeEULA(
@@ -137,8 +135,7 @@ class parseRequestedAmountArgument:
             context = args[2]
 
             # get the user_id
-            chat_id = update.message.chat.id
-            user_id = update.message.from_user.id
+            chat_id, user_id = extractIDs(update)
 
             # check if there is amount specified
             if len(context.args) == 0 and self.is_mandatory:
@@ -294,8 +291,7 @@ class SlateBoy:
         is_mandatory=False, allowed_max=True)
     def handlerRequestWithdraw(self, update, context, requested_amount=None):
         # get the user_id
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # consult the personality
         success, reason, result, approved_amount = self.personality.canWithdraw(
@@ -358,8 +354,7 @@ class SlateBoy:
         allowed_max=False, is_mandatory=True)
     def handlerRequestDeposit(self, update, context, requested_amount=None):
         # get the user_id
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # consult the personality if this deposit is approved
         success, reason, result, approved_amount = self.personality.canDeposit(
@@ -415,7 +410,7 @@ class SlateBoy:
     @checkShouldIgnore('slateboy.msg_balance_ignored_unknown')
     def handlerBalance(self, update, context):
         # get the user_id
-        chat_id = update.message.chat.id
+        chat_id, user_id = extractIDs(update)
 
         # consult the personality to get the balance
         success, reason, balance = self.personality.getBalance(
@@ -454,8 +449,7 @@ class SlateBoy:
     @checkShouldIgnore('slateboy.msg_generic_ignored_unknown')
     def genericTextHandler(self, update, context):
         # get the user_id and the message_id
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
         message_id = update.message.message_id
 
         # does it contain a slatepack?
@@ -549,8 +543,7 @@ class SlateBoy:
     @checkEULA
     def processS1Slatepack(self, update, context, slate, tx_id):
         # get the user_id and the message_id
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # get the amount from the slatepack
         requested_amount = slate.get('amt', -1)
@@ -652,8 +645,7 @@ class SlateBoy:
             requested_amount,
             approved_amount, reject_reason_known, reject_reason_unknown):
         # get the user_id and the message_id
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # check if user has violated ny terms
         if not allowed and reason_of_failure is None and approved_amount is not None:
@@ -693,8 +685,7 @@ class SlateBoy:
             finalMessageMethod,
             standard_instructions, standard_slatepack_formatting):
         # get the user_id
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # check if personality wants custom instruction send
         send_instructions, custom_instructions = customInstructionsMethod(update, context)
@@ -734,8 +725,7 @@ class SlateBoy:
             msg_slatepack_rejected,
             msg_slatepack_finalized):
         # get the user_id and the message_id
-        chat_id = update.message.chat.id
-        user_id = update.message.from_user.id
+        chat_id, user_id = extractIDs(update)
 
         # check if personality wishes to finalize it
         should_finalize, reason = shouldFinalizeQueryMethod(update, context, tx_id)
